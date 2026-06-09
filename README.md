@@ -1,6 +1,6 @@
 # Reservation Concurrency Test App
 
-Spring Boot + Kotlin 기반 정원형 예약 **동시성 테스트 앱**. 4가지 락 전략을 단일 앱에서 비교합니다.
+4가지 락 전략을 단일 앱에서 비교 할 수 있다.
 
 ## Lock Strategies
 
