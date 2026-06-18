@@ -1,8 +1,8 @@
 spring:
   application:
-    name: reservation-concurrency-lab
+    name: booking-system
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:reservation_lab}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:booking_system}
     username: ${DB_USER:lab}
     password: ${DB_PASSWORD:lab}
   jpa:
@@ -25,7 +25,7 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
     consumer:
-      group-id: reservation-lab-consumer
+      group-id: booking-system-consumer
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
@@ -38,6 +38,17 @@ lab:
   kafka:
     topic:
       reservation-confirmed: reservation.confirmed
+  phase-b:
+    enabled: ${PHASE_B_ENABLED:true}
+    duplicate-check:
+      enabled: true
+    redis-inventory:
+      enabled: true
+      skip-for-strategies:
+        - NONE
+    outbox:
+      enabled: true
+      poll-interval-ms: 2000
 
 management:
   endpoints:

@@ -9,6 +9,10 @@ import com.lab.reservation.repository.ReservationRepository
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
+/**
+ * PESSIMISTIC — SELECT FOR UPDATE 행 잠금.
+ * App scale-out 시에도 DB 한 행 직렬화 → 처리량 병목 관찰용.
+ */
 @Component
 class PessimisticLockHandler(
     private val eventRepository: EventRepository,

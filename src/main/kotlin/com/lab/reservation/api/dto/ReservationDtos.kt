@@ -21,6 +21,7 @@ data class ReservationResponse(
     val status: ReservationStatus,
     val lockStrategy: String? = null,
     val remainingCapacity: Int? = null,
+    val idempotentReplay: Boolean = false,
     val createdAt: Instant,
 ) {
     companion object {
@@ -32,6 +33,7 @@ data class ReservationResponse(
                 status = result.reservation.status,
                 lockStrategy = result.lockStrategy.name,
                 remainingCapacity = result.remainingCapacity,
+                idempotentReplay = result.idempotentReplay,
                 createdAt = result.reservation.createdAt,
             )
 

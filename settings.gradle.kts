@@ -1,1 +1,1 @@
-rootProject.name = "reservation-concurrency-lab"
+rootProject.name = "booking-system"

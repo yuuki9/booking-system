@@ -9,5 +9,5 @@ import org.springframework.integration.redis.util.RedisLockRegistry
 class RedisConfig {
     @Bean
     fun redisLockRegistry(connectionFactory: RedisConnectionFactory): RedisLockRegistry =
-        RedisLockRegistry(connectionFactory, "reservation-lab-lock", 10_000)
+        RedisLockRegistry(connectionFactory, "booking-system-lock", 10_000)
 }

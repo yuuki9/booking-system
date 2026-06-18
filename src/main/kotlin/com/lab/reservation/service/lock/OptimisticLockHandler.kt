@@ -12,6 +12,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
+/**
+ * OPTIMISTIC — @Version 낙관적 락.
+ * [체크포인트 4] Phase B에서도 Handler 내부 DB 로직은 동일, 앞단 Redis 선차감은 ReservationService가 담당.
+ */
 @Component
 class OptimisticLockHandler(
     private val eventRepository: EventRepository,

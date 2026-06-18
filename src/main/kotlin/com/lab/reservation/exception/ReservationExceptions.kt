@@ -22,3 +22,17 @@ class DistributedLockFailedException :
 
 class InvalidLockStrategyException(value: String?) :
     ReservationException("INVALID_LOCK_STRATEGY", "Invalid lock strategy: $value")
+
+/** Phase B: (eventId, userId) UNIQUE 또는 사전 검사에 걸린 중복 예약 */
+class DuplicateReservationException(eventId: Long, userId: String) :
+    ReservationException(
+        "DUPLICATE_RESERVATION",
+        "User already has a reservation for event $eventId: $userId",
+    )
+
+/** Phase B: Redis 재고 키가 초기화되지 않음 — syncFromDatabase / reset-data 필요 */
+class RedisInventoryNotInitializedException(eventId: Long) :
+    ReservationException(
+        "REDIS_INVENTORY_NOT_INITIALIZED",
+        "Redis inventory not initialized for event $eventId",
+    )

@@ -9,6 +9,10 @@ import com.lab.reservation.repository.ReservationRepository
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
+/**
+ * NONE — 락 없음 (lab 시나리오 1: 초과 예약 재현용).
+ * Phase B Redis 선차감은 NONE 전략에서 skip 되므로 DB 경합 그대로 관찰 가능.
+ */
 @Component
 class NoneLockHandler(
     private val eventRepository: EventRepository,
