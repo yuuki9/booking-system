@@ -13,7 +13,7 @@ import org.springframework.kafka.config.TopicBuilder
 class KafkaConfig {
     @Bean
     fun reservationConfirmedTopic(
-        @Value("\${lab.kafka.topic.reservation-confirmed}") topic: String,
+        @Value("\${app.kafka.topic.reservation-confirmed}") topic: String,
     ): NewTopic =
         TopicBuilder.name(topic)
             .partitions(3)

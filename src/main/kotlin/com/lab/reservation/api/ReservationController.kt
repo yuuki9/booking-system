@@ -26,7 +26,7 @@ class ReservationController(
     /**
      * 예약 생성 API.
      *
-     * Phase B 헤더:
+     * standard 모드 헤더:
      * - [X-Idempotency-Key]: 동일 키 재전송 시 기존 예약 반환 (200 OK)
      * - [X-Lock-Strategy]: 락 전략 (query param보다 우선순위 낮음)
      */

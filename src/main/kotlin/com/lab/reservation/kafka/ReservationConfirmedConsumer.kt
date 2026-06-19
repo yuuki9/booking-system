@@ -12,7 +12,7 @@ class ReservationConfirmedConsumer {
     private var processedCount = 0L
 
     @KafkaListener(
-        topics = ["\${lab.kafka.topic.reservation-confirmed}"],
+        topics = ["\${app.kafka.topic.reservation-confirmed}"],
         groupId = "booking-system-consumer",
     )
     fun consume(event: ReservationConfirmedEvent) {

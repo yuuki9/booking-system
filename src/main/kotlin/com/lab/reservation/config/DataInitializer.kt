@@ -2,8 +2,9 @@ package com.lab.reservation.config
 
 import com.lab.reservation.domain.Event
 import com.lab.reservation.repository.EventRepository
-import com.lab.reservation.service.inventory.RedisInventoryService
+import com.lab.reservation.service.standard.StandardRedisInventoryService
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.ObjectProvider
 import org.springframework.boot.ApplicationArguments
 import org.springframework.boot.ApplicationRunner
 import org.springframework.context.annotation.Profile
@@ -13,8 +14,8 @@ import org.springframework.stereotype.Component
 @Profile("!consumer")
 class DataInitializer(
     private val eventRepository: EventRepository,
-    private val redisInventoryService: RedisInventoryService,
-    private val phaseBProperties: PhaseBProperties,
+    private val standardRedisInventoryService: ObjectProvider<StandardRedisInventoryService>,
+    private val appModeProperties: AppModeProperties,
 ) : ApplicationRunner {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -33,9 +34,8 @@ class DataInitializer(
             }
         }
 
-        // [체크포인트] Phase B: DB 잔여 좌석 → Redis event:{id}:remaining 동기화
-        if (phaseBProperties.enabled && phaseBProperties.redisInventory.enabled) {
-            redisInventoryService.syncFromDatabase(event.id!!)
+        if (appModeProperties.isStandardMode() && appModeProperties.standard.redisInventory.enabled) {
+            standardRedisInventoryService.ifAvailable { it.syncFromDatabase(event.id!!) }
         }
     }
 }

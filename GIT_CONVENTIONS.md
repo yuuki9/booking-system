@@ -15,7 +15,7 @@
 | `src/main/kotlin/com/lab/reservation/config/` | Redis Lock, Kafka, 시드 데이터 |
 | `src/main/resources/db/migration/` | Flyway 스키마 마이그레이션 |
 | `scripts/k6/` | k6 부하 테스트 시나리오 |
-| `scripts/` | 실험 데이터 리셋 (`reset-lab.sh`, `reset-lab.ps1`) |
+| `scripts/` | 실험 데이터 리셋 (`reset-benchmark.*`, `reset-standard.*`) |
 | `docker-compose.yml`, `Dockerfile`, `nginx/` | 로컬·Scale-out 실행 환경 |
 | `docs/` | 설계 스펙, 테스트 시나리오, 구현 계획 |
 
@@ -84,7 +84,7 @@ type(scope): 짧은 설명 (한 줄)
 |--------|------------------|
 | `app` | `src/` 전반 — API, 락 전략, Kafka, 도메인, Flyway, 테스트 |
 | `bench` | `scripts/k6/` — k6 시나리오·부하 실험 |
-| `deploy` | `Dockerfile`, `docker-compose.yml`, `nginx/`, `scripts/reset-lab.*` |
+| `deploy` | `Dockerfile`, `docker-compose.yml`, `nginx/`, `scripts/reset-*.sh` |
 | `docs` | `README.md`, `docs/`, `GIT_CONVENTIONS.md` |
 | `repo` | `build.gradle.kts`, `.gitignore`, `.github/`, Gradle wrapper 등 루트 설정 |
 

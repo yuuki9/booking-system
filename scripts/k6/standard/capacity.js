@@ -1,5 +1,5 @@
 /**
- * Phase B — 정원 100 / 500 동시 요청 (현업 1스텝 검증)
+ * standard 모드 — 정원 100 / 500 동시 요청
  *
  * 기대:
  * - 201 ≈ 100
@@ -7,9 +7,9 @@
  * - reservedCount === 100
  *
  * 실행:
- *   docker compose --profile single up -d --build
- *   ./scripts/reset-data.sh
- *   docker compose run --rm k6 run /scripts/scenarios/07-phase-b-capacity.js
+ *   APP_MODE=standard docker compose --profile single up -d --build
+ *   ./scripts/reset-standard.sh
+ *   docker compose run --rm k6 run /scripts/standard/capacity.js
  */
 import http from 'k6/http';
 import { check } from 'k6';
@@ -19,7 +19,7 @@ const lockStrategy = __ENV.LOCK_STRATEGY || 'REDIS';
 
 export const options = {
   scenarios: {
-    phase_b_capacity: {
+    standard_capacity: {
       executor: 'shared-iterations',
       vus: 500,
       iterations: 500,
@@ -32,7 +32,7 @@ export const options = {
 };
 
 export default function () {
-  const userId = `phase-b-${__VU}-${__ITER}`;
+  const userId = `standard-${__VU}-${__ITER}`;
   const res = http.post(reservationUrl(lockStrategy), reservationPayload(userId), {
     headers: reservationHeaders(),
   });
@@ -42,6 +42,6 @@ export default function () {
 }
 
 export function handleSummary(data) {
-  console.log(`Phase B capacity test BASE_URL=${BASE_URL} LOCK_STRATEGY=${lockStrategy}`);
+  console.log(`standard capacity test BASE_URL=${BASE_URL} LOCK_STRATEGY=${lockStrategy}`);
   return { stdout: JSON.stringify(data.metrics.http_reqs, null, 2) };
 }

@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component
 @Component
 class ReservationEventPublisher(
     private val kafkaTemplate: KafkaTemplate<String, ReservationConfirmedEvent>,
-    @Value("\${lab.kafka.topic.reservation-confirmed}") private val topic: String,
+    @Value("\${app.kafka.topic.reservation-confirmed}") private val topic: String,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 

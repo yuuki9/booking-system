@@ -2,6 +2,13 @@
 
 > 예약 정원형 도메인(이벤트 1개, capacity=N)을 기준으로 Lock 전략·Scale-out·Kafka·k6 실험 절차를 정리합니다.
 
+## 실행 모드
+
+| 모드 | `APP_MODE` | k6 경로 | reset |
+|------|------------|---------|-------|
+| **benchmark** | `benchmark` | `scripts/k6/benchmark/` | `reset-benchmark.sh` |
+| **standard** | `standard` (기본) | `scripts/k6/standard/` | `reset-standard.sh` |
+
 ---
 
 ## 사전 준비
@@ -45,7 +52,7 @@ docker compose exec postgres psql -U lab -d reservation_lab -c \
 또는 제공되는 reset 스크립트:
 
 ```bash
-./scripts/reset-lab.sh
+./scripts/reset-benchmark.sh
 ```
 
 ---
@@ -85,7 +92,7 @@ curl -X POST "http://localhost:8080/api/v1/reservations?lockStrategy=OPTIMISTIC"
 ### k6 실행
 
 ```bash
-docker compose run --rm k6 run /scripts/scenarios/01-none-overbooking.js
+docker compose run --rm k6 run /scripts/benchmark/01-none-overbooking.js
 ```
 
 ### 수동 검증
@@ -122,7 +129,7 @@ docker compose exec postgres psql -U lab -d reservation_lab -c \
 ### k6 실행
 
 ```bash
-docker compose run --rm k6 run /scripts/scenarios/02-optimistic-contention.js
+docker compose run --rm k6 run /scripts/benchmark/02-optimistic-contention.js
 ```
 
 ### 수동 검증
@@ -153,7 +160,7 @@ curl http://localhost:8080/api/v1/events/1
 ### k6 실행
 
 ```bash
-docker compose run --rm k6 run /scripts/scenarios/03-pessimistic-throughput.js
+docker compose run --rm k6 run /scripts/benchmark/03-pessimistic-throughput.js
 ```
 
 ### 성공 기준
@@ -177,7 +184,7 @@ docker compose run --rm k6 run /scripts/scenarios/03-pessimistic-throughput.js
 ### k6 실행
 
 ```bash
-docker compose run --rm k6 run /scripts/scenarios/04-redis-distributed-lock.js
+docker compose run --rm k6 run /scripts/benchmark/04-redis-distributed-lock.js
 ```
 
 ### Redis 락 키 확인 (선택)
@@ -200,14 +207,14 @@ docker compose exec redis redis-cli KEYS "event:*:lock"
 
 ### 절차
 
-1. 데이터 초기화 (`reset-lab.sh`)
+1. 데이터 초기화 (`reset-benchmark.sh`)
 2. 각 전략별 k6 실행 (01~04 또는 통합 `05-compare-all.js`)
 3. 결과를 표로 정리
 
 ### k6 실행 (통합 비교)
 
 ```bash
-docker compose run --rm k6 run /scripts/scenarios/05-compare-all.js
+docker compose run --rm k6 run /scripts/benchmark/05-compare-all.js
 ```
 
 ### 기록할 메트릭
@@ -235,16 +242,16 @@ docker compose run --rm k6 run /scripts/scenarios/05-compare-all.js
 
 ```bash
 docker compose --profile single up -d --build
-./scripts/reset-lab.sh
-docker compose run --rm k6 run -e LOCK_STRATEGY=REDIS /scripts/scenarios/06-scale-out.js
+./scripts/reset-benchmark.sh
+docker compose run --rm k6 run -e LOCK_STRATEGY=REDIS /scripts/benchmark/06-scale-out.js
 ```
 
 ### 6-B: 3 인스턴스 + Nginx LB
 
 ```bash
 docker compose --profile scale3 up -d
-./scripts/reset-lab.sh
-docker compose run --rm k6 run -e LOCK_STRATEGY=REDIS /scripts/scenarios/06-scale-out.js
+./scripts/reset-benchmark.sh
+docker compose run --rm k6 run -e LOCK_STRATEGY=REDIS /scripts/benchmark/06-scale-out.js
 ```
 
 ### Nginx 업스트림 확인
@@ -279,7 +286,7 @@ docker compose logs app-1 app-2 app-3 --tail 20
 ### 절차
 
 ```bash
-./scripts/reset-lab.sh
+./scripts/reset-benchmark.sh
 
 # Consumer 로그 tail
 docker compose logs -f reservation-consumer &
@@ -319,7 +326,7 @@ docker compose exec kafka kafka-console-consumer \
 
 ```bash
 docker compose up -d --wait
-./scripts/reset-lab.sh
+./scripts/reset-benchmark.sh
 
 # 헬스
 curl -f http://localhost:8080/actuator/health
@@ -345,7 +352,8 @@ curl -f http://localhost:8080/api/v1/events/1
 
 ```
 scripts/
-├── reset-lab.sh
+├── reset-benchmark.sh
+├── reset-standard.sh
 └── k6/
     └── scenarios/
         ├── 01-none-overbooking.js
@@ -400,7 +408,7 @@ export const options = {
 | 증상 | 확인 |
 |------|------|
 | 503 / connection refused | `docker compose ps`, Nginx·App 기동 여부 |
-| 항상 409 | `reset-lab.sh`로 정원 리셋 |
+| 항상 409 | `reset-benchmark.sh`로 정원 리셋 |
 | REDIS 전략만 실패 | `docker compose logs redis`, Redis 연결 설정 |
 | Kafka 메시지 없음 | Producer 로그, `reservation.confirmed` 토픽 존재 여부 |
 | 3대인데 한 인스턴스만 처리 | Nginx upstream 설정, `scale3` profile 적용 여부 |

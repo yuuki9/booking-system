@@ -33,13 +33,13 @@ spring:
         spring.json.trusted.packages: com.lab.reservation.kafka
         spring.json.value.default.type: com.lab.reservation.kafka.ReservationConfirmedEvent
 
-lab:
+app:
+  mode: ${APP_MODE:standard}
   lock-strategy: ${LOCK_STRATEGY:OPTIMISTIC}
   kafka:
     topic:
       reservation-confirmed: reservation.confirmed
-  phase-b:
-    enabled: ${PHASE_B_ENABLED:true}
+  standard:
     duplicate-check:
       enabled: true
     redis-inventory:

@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * REDIS — RedisLockRegistry 분산 락 + DB 트랜잭션.
- * Phase B에서는 ReservationService의 Redis 재고 선차감 + 이 Handler의 event-lock 이중 방어.
+ * standard 모드에서는 ReservationService의 Redis 재고 선차감 + 이 Handler의 event-lock 이중 방어.
  */
 @Component
 class RedisLockHandler(

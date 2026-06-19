@@ -1,4 +1,4 @@
--- Phase B: 현업 1스텝 하드닝
+-- standard 모드 하드닝
 -- 1) 동일 사용자 중복 예약 방지
 -- 2) Kafka Outbox (DB 커밋과 이벤트 발행 분리)
 -- 3) 멱등성 키 저장 (X-Idempotency-Key 재전송 대응)

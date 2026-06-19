@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component
 
 @Component
 class LockStrategyResolver(
-    @Value("\${lab.lock-strategy}") private val defaultStrategy: String,
+    @Value("\${app.lock-strategy}") private val defaultStrategy: String,
 ) {
     fun resolve(queryStrategy: String?, headerStrategy: String?): LockStrategy {
         val query = LockStrategy.from(queryStrategy)

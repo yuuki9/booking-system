@@ -1,5 +1,6 @@
 x-app-env: &app-env
   SPRING_PROFILES_ACTIVE: api
+  APP_MODE: standard
   DB_HOST: postgres
   DB_PORT: 5432
   DB_NAME: booking_system
