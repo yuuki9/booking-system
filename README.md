@@ -8,7 +8,7 @@ Kotlin · Spring Boot 3 · PostgreSQL · Redis · Kafka · Docker Compose · k6
 
 ---
 
-## 시스템 아키텍처
+## System Architecture
 
 ![동시성 예약 시스템 아키텍처](docs/architecture.png)
 
