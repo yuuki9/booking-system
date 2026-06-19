@@ -1,0 +1,12 @@
+app:
+  mode: benchmark
+
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 50
+
+logging:
+  level:
+    com.lab.reservation: WARN
+    org.testcontainers: INFO
