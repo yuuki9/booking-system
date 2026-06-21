@@ -15,7 +15,7 @@
 | **standard** (기본) | `APP_MODE=standard` | 실무형 시나리오 검증 (멱등·중복검사·Redis 선차감·Outbox). **AWS 환경에서 검증 완료** |
 
 > **standard** 모드는 RDS·ElastiCache·MSK 등 AWS 구성 위에서 멱등 재전송, 중복 예약 차단, Outbox 기반 Kafka 발행 등 실무형 흐름을 검증했습니다.  
-> **basic** 모드는 로컬/Docker Compose에서 Lock Handler 동작·k6 부하 비교용입니다.
+> **basic** 모드는 Lock Handler 비교용 단순 Flow이며, k6 벤치마크도 AWS API 대상으로 실행했습니다.
 
 AWS API 기동 예:
 
@@ -40,6 +40,42 @@ docker compose --profile single up -d --build
 ./scripts/reset-standard.sh
 docker compose run --rm k6 run /scripts/standard/capacity.js
 ```
+
+---
+
+## k6 벤치마크 요약 (AWS)
+
+`SPRING_PROFILES_ACTIVE=aws` · RDS · ElastiCache · MSK · ALB 뒤 API에 k6를 실행한 결과입니다.  
+정원 **100**, 이벤트 1개 기준.
+
+### basic — Lock Handler 4종 (`01`~`04`, 동시 200건 · NONE만 150건)
+
+| 전략 | 201 | 409 | p95 | reservedCount | 정원 |
+|------|-----|-----|-----|---------------|------|
+| NONE | 132 | 18 | 88ms | **132** | ❌ 초과 예약 |
+| OPTIMISTIC | 100 | 100 | 115ms | 100 | ✅ |
+| PESSIMISTIC | 100 | 100 | 340ms | 100 | ✅ |
+| REDIS | 100 | 100 | 168ms | 100 | ✅ |
+
+→ **정확성:** NONE만 초과 예약 · **지연:** PESSIMISTIC(행 잠금) > REDIS > OPTIMISTIC
+
+### basic — Scale-out (`06-scale-out.js`, REDIS · 200건)
+
+| 구성 | 201 | p95 | reservedCount |
+|------|-----|-----|---------------|
+| API 1대 | 100 | 165ms | 100 |
+| API 3대 + ALB | 100 | 138ms | 100 |
+
+→ 다중 인스턴스에서도 **정원 100 유지** (REDIS 분산 락)
+
+### standard — 실무 시나리오
+
+| 시나리오 | 조건 | 201 | 409 | 검증 |
+|----------|------|-----|-----|------|
+| **capacity** | 500 동시 · REDIS | 100 | 400 | ✅ 정원 준수 |
+| **duplicate-user** | **같은 userId** 10회 | 1 | 9 | ✅ 1인 1예약 |
+
+→ **duplicate-user:** 한 사용자가 같은 이벤트를 연속 신청해도 예약 1건만 성공 (`DUPLICATE_RESERVATION`)
 
 ---
 
