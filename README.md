@@ -4,8 +4,6 @@
 
 이벤트마다 받을 수 있는 최대 인원(`capacity`)이 있고, 예약이 하나 들어올 때마다 남은 자리는 하나씩 줄어듭니다.  
 같은 상황에서도 **예약을 처리하는 방법**을 여러 가지로 바꿔 보며, 어떤 방식이 더 안정적인지 비교해 볼 수 있습니다.
-
----
 ## System Architecture
 
 ![동시성 예약 시스템 아키텍처](docs/architecture.png)
@@ -18,14 +16,16 @@ k6/클라이언트 → Nginx → API 서버 3대 → PostgreSQL · Redis · Kafk
 | **basic** | `APP_MODE=basic` | 의도적으로 단순화한 비교용 실행 모드 (4종 Lock Handler → DB → Kafka) |
 | **standard** (기본) | `APP_MODE=standard` | 실무형 시나리오 검증 **AWS 환경에서 구동** |
 
----
+
+<br>
+<br>
 
 ## k6 벤치마크 요약 (AWS)
 
 `SPRING_PROFILES_ACTIVE=aws` · RDS · ElastiCache · MSK · ALB 뒤 API에 k6를 실행한 결과.
 예약 **100**개에 대한 레이스 컨디션
 
-### basic — Lock Handler 4종 (`01`~`04`, 동시 200건 · NONE만 150건)
+### basic — Lock Handler 4종 (`01`~`04`, 동시 200건)
 
 | 전략 | 201 | 409 | p95 | reservedCount | 예약 |
 |------|-----|-----|-----|---------------|------|
