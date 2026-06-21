@@ -22,12 +22,12 @@ k6/클라이언트 → Nginx → API 서버 3대 → PostgreSQL · Redis · Kafk
 
 ## k6 벤치마크 요약 (AWS)
 
-`SPRING_PROFILES_ACTIVE=aws` · RDS · ElastiCache · MSK · ALB 뒤 API에 k6를 실행한 결과입니다.  
-정원 **100**, 이벤트 1개 기준.
+`SPRING_PROFILES_ACTIVE=aws` · RDS · ElastiCache · MSK · ALB 뒤 API에 k6를 실행한 결과.
+예약 **100**개에 대한 레이스 컨디션, 이벤트 1개 기준.
 
 ### basic — Lock Handler 4종 (`01`~`04`, 동시 200건 · NONE만 150건)
 
-| 전략 | 201 | 409 | p95 | reservedCount | 정원 |
+| 전략 | 201 | 409 | p95 | reservedCount | 예약 |
 |------|-----|-----|-----|---------------|------|
 | NONE | 132 | 18 | 88ms | **132** | ❌ 초과 예약 |
 | OPTIMISTIC | 100 | 100 | 115ms | 100 | ✅ |
@@ -48,7 +48,7 @@ k6/클라이언트 → Nginx → API 서버 3대 → PostgreSQL · Redis · Kafk
 
 | 시나리오 | 조건 | 201 | 409 | 검증 |
 |----------|------|-----|-----|------|
-| **capacity** | 500 동시 · REDIS | 100 | 400 | ✅ 정원 준수 |
+| **capacity** | 500 동시 · REDIS | 100 | 400 | ✅ 예약 준수 |
 | **duplicate-user** | **같은 userId** 10회 | 1 | 9 | ✅ 1인 1예약 |
 
 
