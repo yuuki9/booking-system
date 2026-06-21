@@ -8,13 +8,13 @@
 
 코드는 **두 갈래**로 나뉩니다.
 
-| | benchmark | standard |
+| | basic | standard |
 |---|-----------|----------|
-| **역할** | 성능 측정·비교용 | 실제 운영용 |
-| **목적** | 락 전략 4종을 **공정하게** k6로 벤치마킹 | 멱등·중복 방지·Outbox 등 **프로덕션 하드닝** |
-| **구현** | `BenchmarkReservationFlow` | `StandardReservationFlow` |
+| **역할** | 락 Handler 기본 동작 | 실제 운영 |
+| **목적** | 4종 Lock Handler → DB → Kafka (동작 검증·k6 실험) | 멱등·중복 방지·Outbox 등 **프로덕션 하드닝** |
+| **구현** | `BasicReservationFlow` | `StandardReservationFlow` |
 
-- **benchmark** — 동시성 전략(`NONE`, `OPTIMISTIC`, `PESSIMISTIC`, `REDIS`)만 격리해 측정합니다. 멱등·Outbox·Redis 선차감 같은 부가 로직은 **의도적으로 빼서** 전략 간 차이만 비교합니다.
+- **basic** — `NONE`, `OPTIMISTIC`, `PESSIMISTIC`, `REDIS` Handler 동작만 노출합니다. 멱등·Outbox·Redis 선차감은 **의도적으로 제외**합니다.
 - **standard** — 실제 서비스에 가까운 코드입니다. 재전송 대응, 중복 예약 차단, 재고 선차감, DB 커밋과 Kafka 발행 분리(Outbox)를 포함합니다.
 
 기술 스택: **Kotlin**, **Spring Boot 3.4**, **PostgreSQL**, **Redis**, **Kafka**, **Flyway**, **Docker Compose**, **k6**(부하 테스트)
@@ -49,9 +49,10 @@ Client / k6
 | 모드 | 환경변수 | 성격 |
 |------|----------|------|
 | **standard** (기본) | `APP_MODE=standard` | **운영 코드** — 멱등·중복검사·Redis 선차감·Outbox |
-| **benchmark** | `APP_MODE=benchmark` | **벤치마크 코드** — 락 전략 성능 비교 전용 |
+| **basic** | `APP_MODE=basic` | **기본 Flow** — Lock Handler 동작 검증·k6 실험 |
+| **aws** (Spring profile) | `SPRING_PROFILES_ACTIVE=aws` | **AWS 배포** — standard + RDS SSL·MSK pre-provisioned topic |
 
-`APP_MODE`에 따라 `ReservationCreationFlow` 구현체가 `@ConditionalOnProperty`로 하나만 활성화됩니다. benchmark는 실험용 단순 경로, standard는 배포 대상 경로입니다.
+`APP_MODE`에 따라 `ReservationCreationFlow` 구현체가 `@ConditionalOnProperty`로 하나만 활성화됩니다. basic은 Handler 검증용 단순 경로, standard는 배포 대상 경로입니다.
 
 ---
 
@@ -84,7 +85,7 @@ POST /api/v1/reservations
 
 Outbox는 `StandardOutboxPublisher`가 폴링하여 Kafka로 발행합니다.
 
-### benchmark 모드
+### basic 모드
 
 ```
 POST /api/v1/reservations
@@ -112,12 +113,12 @@ booking-system/
 │       ├── ReservationLockExecutor.kt  # LockHandler 라우팅
 │       ├── LockStrategyResolver.kt
 │       ├── lock/                       # 4종 LockHandler 구현
-│       ├── standard/                   # standard 모드 전용 (Outbox, Redis 재고)
-│       └── benchmark/                  # benchmark 모드 Flow
+│       ├── basic/                      # basic 모드 Flow
+│       └── standard/                   # standard 모드 전용 (Outbox, Redis 재고)
 ├── src/main/resources/
 │   ├── application.yml
 │   └── db/migration/                   # Flyway (V1 init, V2 hardening)
-├── src/test/kotlin/                    # 단위·통합·벤치마크 테스트
+├── src/test/kotlin/com/lab/reservation/integration/lock/  # 락 전략 동시성 통합 테스트
 ├── scripts/
 │   ├── reset-*.sh / *.ps1              # DB·Redis 초기화
 │   └── k6/                             # 부하 테스트 스크립트
@@ -151,13 +152,19 @@ booking-system/
 docker compose --profile single up -d --build
 ./scripts/reset-standard.sh
 
-# benchmark — 락 전략 비교
-APP_MODE=benchmark docker compose --profile single up -d --build
-./scripts/reset-benchmark.sh
+# basic — Lock Handler 동작 + k6 부하 비교
+APP_MODE=basic docker compose --profile single up -d --build
+./scripts/reset-basic.sh
 docker compose run --rm k6 run /scripts/benchmark/05-compare-all.js
 
 # 3대 스케일아웃
 docker compose --profile scale3 up -d --build
+
+# AWS (standard, RDS · ElastiCache · MSK)
+SPRING_PROFILES_ACTIVE=aws \
+DB_HOST=... REDIS_HOST=... KAFKA_BOOTSTRAP_SERVERS=... \
+DB_USER=... DB_PASSWORD=... \
+java -jar app.jar
 ```
 
 테스트:

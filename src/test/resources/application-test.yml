@@ -1,5 +1,5 @@
 app:
-  mode: benchmark
+  mode: basic
 
 spring:
   datasource:

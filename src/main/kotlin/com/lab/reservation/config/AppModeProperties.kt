@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 /**
  * 애플리케이션 실행 모드 및 standard 모드 전용 기능 설정.
  *
- * - benchmark: 4가지 락 전략 비교 실험 (Handler → DB → Kafka)
+ * - basic: 4가지 락 Handler → DB → Kafka (락 동작 검증·k6 실험용)
  * - standard: 멱등·중복검사·Redis 선차감·Outbox (기본값)
  */
 @ConfigurationProperties(prefix = "app")
@@ -14,7 +14,7 @@ data class AppModeProperties(
     val mode: AppMode = AppMode.STANDARD,
     val standard: StandardFeatures = StandardFeatures(),
 ) {
-    fun isBenchmarkMode(): Boolean = mode == AppMode.BENCHMARK
+    fun isBasicMode(): Boolean = mode == AppMode.BASIC
 
     fun isStandardMode(): Boolean = mode == AppMode.STANDARD
 

@@ -11,16 +11,31 @@
 
 | 모드 | 환경변수 | 목적 |
 |------|----------|------|
-| **benchmark** | `APP_MODE=benchmark` | 4가지 락 전략 비교 실험 (Handler → DB → Kafka) |
-| **standard** (기본) | `APP_MODE=standard` | 멱등·중복검사·Redis 선차감·Outbox 포함 |
+| **basic** | `APP_MODE=basic` | 의도적으로 단순화한 비교용 실행 모드 (4종 Lock Handler → DB → Kafka) |
+| **standard** (기본) | `APP_MODE=standard` | 실무형 시나리오 검증 (멱등·중복검사·Redis 선차감·Outbox). **AWS 환경에서 검증 완료** |
+
+> **standard** 모드는 RDS·ElastiCache·MSK 등 AWS 구성 위에서 멱등 재전송, 중복 예약 차단, Outbox 기반 Kafka 발행 등 실무형 흐름을 검증했습니다.  
+> **basic** 모드는 로컬/Docker Compose에서 Lock Handler 동작·k6 부하 비교용입니다.
+
+AWS API 기동 예:
 
 ```bash
-# benchmark — 락 전략 4종 k6 비교
-APP_MODE=benchmark docker compose --profile single up -d --build
-./scripts/reset-benchmark.sh
+SPRING_PROFILES_ACTIVE=aws \
+DB_HOST=<rds-endpoint> DB_USER=... DB_PASSWORD=... \
+REDIS_HOST=<elasticache-endpoint> \
+KAFKA_BOOTSTRAP_SERVERS=<msk-bootstrap-brokers> \
+java -jar app.jar
+```
+
+Consumer: `SPRING_PROFILES_ACTIVE=aws,consumer` (동일 DB/Redis/Kafka 환경변수)
+
+```bash
+# basic — 의도적으로 단순화한 비교용 실행 모드
+APP_MODE=basic docker compose --profile single up -d --build
+./scripts/reset-basic.sh
 docker compose run --rm k6 run /scripts/benchmark/05-compare-all.js
 
-# standard — 운영형 흐름 (기본값)
+# standard — 실무형 시나리오 검증 (기본값)
 docker compose --profile single up -d --build
 ./scripts/reset-standard.sh
 docker compose run --rm k6 run /scripts/standard/capacity.js

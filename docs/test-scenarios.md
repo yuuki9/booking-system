@@ -6,7 +6,7 @@
 
 | 모드 | `APP_MODE` | k6 경로 | reset |
 |------|------------|---------|-------|
-| **benchmark** | `benchmark` | `scripts/k6/benchmark/` | `reset-benchmark.sh` |
+| **basic** | `basic` | `scripts/k6/benchmark/` | `reset-basic.sh` |
 | **standard** | `standard` (기본) | `scripts/k6/standard/` | `reset-standard.sh` |
 
 ---
@@ -52,7 +52,7 @@ docker compose exec postgres psql -U lab -d reservation_lab -c \
 또는 제공되는 reset 스크립트:
 
 ```bash
-./scripts/reset-benchmark.sh
+./scripts/reset-basic.sh
 ```
 
 ---
@@ -207,7 +207,7 @@ docker compose exec redis redis-cli KEYS "event:*:lock"
 
 ### 절차
 
-1. 데이터 초기화 (`reset-benchmark.sh`)
+1. 데이터 초기화 (`reset-basic.sh`)
 2. 각 전략별 k6 실행 (01~04 또는 통합 `05-compare-all.js`)
 3. 결과를 표로 정리
 
@@ -242,7 +242,7 @@ docker compose run --rm k6 run /scripts/benchmark/05-compare-all.js
 
 ```bash
 docker compose --profile single up -d --build
-./scripts/reset-benchmark.sh
+./scripts/reset-basic.sh
 docker compose run --rm k6 run -e LOCK_STRATEGY=REDIS /scripts/benchmark/06-scale-out.js
 ```
 
@@ -250,7 +250,7 @@ docker compose run --rm k6 run -e LOCK_STRATEGY=REDIS /scripts/benchmark/06-scal
 
 ```bash
 docker compose --profile scale3 up -d
-./scripts/reset-benchmark.sh
+./scripts/reset-basic.sh
 docker compose run --rm k6 run -e LOCK_STRATEGY=REDIS /scripts/benchmark/06-scale-out.js
 ```
 
@@ -286,7 +286,7 @@ docker compose logs app-1 app-2 app-3 --tail 20
 ### 절차
 
 ```bash
-./scripts/reset-benchmark.sh
+./scripts/reset-basic.sh
 
 # Consumer 로그 tail
 docker compose logs -f reservation-consumer &
@@ -326,7 +326,7 @@ docker compose exec kafka kafka-console-consumer \
 
 ```bash
 docker compose up -d --wait
-./scripts/reset-benchmark.sh
+./scripts/reset-basic.sh
 
 # 헬스
 curl -f http://localhost:8080/actuator/health
@@ -352,7 +352,7 @@ curl -f http://localhost:8080/api/v1/events/1
 
 ```
 scripts/
-├── reset-benchmark.sh
+├── reset-basic.sh
 ├── reset-standard.sh
 └── k6/
     └── scenarios/
@@ -408,7 +408,7 @@ export const options = {
 | 증상 | 확인 |
 |------|------|
 | 503 / connection refused | `docker compose ps`, Nginx·App 기동 여부 |
-| 항상 409 | `reset-benchmark.sh`로 정원 리셋 |
+| 항상 409 | `reset-basic.sh`로 정원 리셋 |
 | REDIS 전략만 실패 | `docker compose logs redis`, Redis 연결 설정 |
 | Kafka 메시지 없음 | Producer 로그, `reservation.confirmed` 토픽 존재 여부 |
 | 3대인데 한 인스턴스만 처리 | Nginx upstream 설정, `scale3` profile 적용 여부 |

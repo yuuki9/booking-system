@@ -1,4 +1,4 @@
-package com.lab.reservation.benchmark.support
+package com.lab.reservation.integration.lock.support
 
 import com.lab.reservation.domain.LockStrategy
 import com.lab.reservation.kafka.ReservationEventPublisher
@@ -6,7 +6,7 @@ import com.lab.reservation.repository.EventRepository
 import com.lab.reservation.repository.ReservationRepository
 import com.lab.reservation.service.ReservationResult
 import com.lab.reservation.service.ReservationService
-import com.lab.reservation.service.benchmark.BenchmarkReservationFlow
+import com.lab.reservation.service.basic.BasicReservationFlow
 import org.junit.jupiter.api.BeforeEach
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -29,7 +29,7 @@ import kotlin.test.assertTrue
 @SpringBootTest
 @ActiveProfiles("test")
 @Testcontainers(disabledWithoutDocker = true)
-abstract class BenchmarkIntegrationTestSupport {
+abstract class LockStrategyIntegrationTestSupport {
     @Autowired
     protected lateinit var reservationService: ReservationService
 
@@ -43,14 +43,14 @@ abstract class BenchmarkIntegrationTestSupport {
     protected lateinit var jdbcTemplate: JdbcTemplate
 
     @Autowired(required = false)
-    protected var benchmarkReservationFlow: BenchmarkReservationFlow? = null
+    protected var basicReservationFlow: BasicReservationFlow? = null
 
     @MockBean
     protected lateinit var reservationEventPublisher: ReservationEventPublisher
 
     @BeforeEach
-    fun setUpBenchmarkCase() {
-        assertNotNull(benchmarkReservationFlow, "APP_MODE=benchmark 여야 BenchmarkReservationFlow가 로드됩니다")
+    fun setUpEach() {
+        assertNotNull(basicReservationFlow, "APP_MODE=basic 여야 BasicReservationFlow가 로드됩니다")
         jdbcTemplate.execute("TRUNCATE idempotency_records, reservation_outbox, reservations RESTART IDENTITY CASCADE")
         jdbcTemplate.update("UPDATE events SET reserved_count = 0, version = 0 WHERE id = (SELECT MIN(id) FROM events)")
     }
@@ -77,7 +77,7 @@ abstract class BenchmarkIntegrationTestSupport {
                 try {
                     reservationService.createReservation(
                         eventId = eventId,
-                        userId = "bench-user-$lockStrategy-$index",
+                        userId = "lock-test-$lockStrategy-$index",
                         lockStrategy = lockStrategy,
                         idempotencyKey = null,
                     )

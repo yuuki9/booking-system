@@ -1,0 +1,43 @@
+# AWS 배포용 (standard 모드). RDS · ElastiCache · MSK 엔드포인트는 환경변수로 주입.
+# API: SPRING_PROFILES_ACTIVE=aws
+# Consumer: SPRING_PROFILES_ACTIVE=aws,consumer
+
+app:
+  mode: standard
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME:booking_system}?sslmode=${RDS_SSLMODE:require}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:20}
+      minimum-idle: ${DB_POOL_MIN:5}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+      # ElastiCache in-transit encryption 사용 시 REDIS_SSL=true
+      ssl:
+        enabled: ${REDIS_SSL:false}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    admin:
+      auto-create: false
+    properties:
+      # MSK TLS/SASL 사용 시 예: KAFKA_SECURITY_PROTOCOL=SASL_SSL
+      security.protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    com.lab.reservation: INFO

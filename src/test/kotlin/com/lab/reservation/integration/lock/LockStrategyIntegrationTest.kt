@@ -1,10 +1,10 @@
-package com.lab.reservation.benchmark
+package com.lab.reservation.integration.lock
 
-import com.lab.reservation.benchmark.support.BenchmarkIntegrationTestSupport
 import com.lab.reservation.domain.LockStrategy
 import com.lab.reservation.exception.CapacityExceededException
 import com.lab.reservation.exception.DistributedLockFailedException
 import com.lab.reservation.exception.OptimisticLockConflictException
+import com.lab.reservation.integration.lock.support.LockStrategyIntegrationTestSupport
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -14,8 +14,8 @@ import org.junit.jupiter.api.Test
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.orm.ObjectOptimisticLockingFailureException
 
-@DisplayName("benchmark 모드 락 전략 비교")
-class BenchmarkLockStrategyTest : BenchmarkIntegrationTestSupport() {
+@DisplayName("락 전략 동시성 검증 (APP_MODE=basic)")
+class LockStrategyIntegrationTest : LockStrategyIntegrationTestSupport() {
 
     @Nested
     @DisplayName("NONE — 락 없음")
@@ -108,8 +108,12 @@ class BenchmarkLockStrategyTest : BenchmarkIntegrationTestSupport() {
         }
     }
 
+    /**
+     * 분산(멀티 인스턴스) 검증은 k6 + compose scale3.
+     * 여기서는 RedisLockHandler + Testcontainers Redis 단일 인스턴스 동작만 확인합니다.
+     */
     @Nested
-    @DisplayName("REDIS — 분산 락")
+    @DisplayName("REDIS — RedisLockHandler (단일 인스턴스)")
     inner class Redis {
         @Test
         fun `단일 예약은 정상 생성된다`() {

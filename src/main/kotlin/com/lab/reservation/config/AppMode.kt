@@ -1,6 +1,6 @@
 package com.lab.reservation.config
 
 enum class AppMode {
-    BENCHMARK,
+    BASIC,
     STANDARD,
 }

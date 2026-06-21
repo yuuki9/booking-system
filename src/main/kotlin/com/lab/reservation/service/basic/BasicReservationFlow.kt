@@ -1,4 +1,4 @@
-package com.lab.reservation.service.benchmark
+package com.lab.reservation.service.basic
 
 import com.lab.reservation.domain.LockStrategy
 import com.lab.reservation.kafka.ReservationConfirmedEvent
@@ -12,13 +12,12 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * benchmark 모드: Lock Handler → DB → Kafka 직접 publish.
+ * basic 모드: Lock Handler → DB → Kafka 직접 publish.
  *
- * 멱등·중복검사·Redis 선차감·Outbox 없이 4가지 락 전략 비교에 집중합니다.
  */
 @Component
-@ConditionalOnProperty(name = ["app.mode"], havingValue = "benchmark")
-class BenchmarkReservationFlow(
+@ConditionalOnProperty(name = ["app.mode"], havingValue = "basic")
+class BasicReservationFlow(
     private val lockExecutor: ReservationLockExecutor,
     private val eventRepository: EventRepository,
     private val reservationEventPublisher: ReservationEventPublisher,
