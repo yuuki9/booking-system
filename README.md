@@ -23,7 +23,7 @@ k6/클라이언트 → Nginx → API 서버 3대 → PostgreSQL · Redis · Kafk
 ## k6 벤치마크 요약 (AWS)
 
 `SPRING_PROFILES_ACTIVE=aws` · RDS · ElastiCache · MSK · ALB 뒤 API에 k6를 실행한 결과.
-예약 **100**개에 대한 레이스 컨디션, 이벤트 1개 기준.
+예약 **100**개에 대한 레이스 컨디션
 
 ### basic — Lock Handler 4종 (`01`~`04`, 동시 200건 · NONE만 150건)
 
