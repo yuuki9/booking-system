@@ -8,5 +8,5 @@ spring:
 
 logging:
   level:
-    com.lab.reservation: WARN
+    com.lab.reservation.service.lock: WARN
     org.testcontainers: INFO

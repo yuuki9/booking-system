@@ -6,6 +6,7 @@ import com.lab.reservation.exception.CapacityExceededException
 import com.lab.reservation.exception.EventNotFoundException
 import com.lab.reservation.repository.EventRepository
 import com.lab.reservation.repository.ReservationRepository
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
@@ -18,12 +19,21 @@ class PessimisticLockHandler(
     private val eventRepository: EventRepository,
     private val reservationRepository: ReservationRepository,
 ) : ReservationLockHandler {
+    private val log = LoggerFactory.getLogger(javaClass)
+
     override val strategy: LockStrategy = LockStrategy.PESSIMISTIC
 
     @Transactional
     override fun reserve(eventId: Long, userId: String): Reservation {
+        val lockWaitStart = System.nanoTime()
         val event = eventRepository.findByIdForUpdate(eventId).orElseThrow { EventNotFoundException(eventId) }
+        val lockWaitMs = (System.nanoTime() - lockWaitStart) / 1_000_000
+        if (lockWaitMs > 0) {
+            log.warn("PESSIMISTIC row lock waited {}ms eventId={} userId={}", lockWaitMs, eventId, userId)
+        }
+
         if (event.reservedCount >= event.capacity) {
+            log.warn("PESSIMISTIC capacity exceeded eventId={} reserved={}/{}", eventId, event.reservedCount, event.capacity)
             throw CapacityExceededException()
         }
         event.reservedCount++

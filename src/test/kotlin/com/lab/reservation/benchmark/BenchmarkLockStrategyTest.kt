@@ -30,20 +30,20 @@ class BenchmarkLockStrategyTest : BenchmarkIntegrationTestSupport() {
         }
 
         @Test
-        fun `동시 요청 시 PESSIMISTIC보다 정원 보장이 약하다`() {
-            val noneOutcomes = runConcurrentReservations(requestCount = 150, lockStrategy = LockStrategy.NONE)
-            val noneSuccess = noneOutcomes.count { it.succeeded }
+        fun `동시 요청 시 동시성 파괴 재현`() {
+            val outcomes = runConcurrentReservations(requestCount = 150, lockStrategy = LockStrategy.NONE)
+            val successCount = outcomes.count { it.succeeded }
+            val reservationCount = reservationRepository.count()
+            val reservedCount = eventRepository.findAll().first().reservedCount
 
-            setUpBenchmarkCase()
-
-            val pessimisticOutcomes = runConcurrentReservations(requestCount = 150, lockStrategy = LockStrategy.PESSIMISTIC)
-            val pessimisticSuccess = pessimisticOutcomes.count { it.succeeded }
-
-            assertEquals(100, pessimisticSuccess)
-            assertEquals(100, reservationRepository.count())
             assertTrue(
-                noneSuccess < pessimisticSuccess,
-                "NONE은 PESSIMISTIC처럼 100건을 모두 성공시키지 않아야 합니다. none=$noneSuccess pessimistic=$pessimisticSuccess",
+                reservationCount > 100 || reservedCount > 100,
+                "NONE(락 없음)은 초과 예약이 발생해야 합니다. " +
+                    "success=$successCount reservations=$reservationCount reservedCount=$reservedCount",
+            )
+            assertTrue(
+                successCount > 100,
+                "NONE은 150건 중 100건을 초과해 성공해야 합니다. success=$successCount",
             )
         }
     }
@@ -59,7 +59,7 @@ class BenchmarkLockStrategyTest : BenchmarkIntegrationTestSupport() {
         }
 
         @Test
-        fun `동시 200건 후 DB 정원은 100을 넘지 않는다`() {
+        fun `동시 200건 중 정확히 100건만 성공한다`() {
             val outcomes = runConcurrentReservations(requestCount = 200, lockStrategy = LockStrategy.OPTIMISTIC)
             val event = eventRepository.findAll().first()
             val reservationCount = reservationRepository.count()
@@ -119,7 +119,7 @@ class BenchmarkLockStrategyTest : BenchmarkIntegrationTestSupport() {
         }
 
         @Test
-        fun `동시 200건 후 DB 정원은 정확히 100이다`() {
+        fun `동시 200건 중 정확히 100건만 성공한다`() {
             val outcomes = runConcurrentReservations(requestCount = 200, lockStrategy = LockStrategy.REDIS)
             val event = eventRepository.findAll().first()
 
