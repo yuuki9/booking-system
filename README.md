@@ -16,6 +16,166 @@ k6/클라이언트 → Nginx → API 서버 3대 → PostgreSQL · Redis · Kafk
 | **basic** | `APP_MODE=basic` | 의도적으로 단순화한 비교용 실행 모드 (4종 Lock Handler → DB → Kafka) |
 | **standard** (기본) | `APP_MODE=standard` | 실무형 시나리오 검증 **AWS 환경에서 구동** |
 
+## Docker 환경에서 테스트하기
+
+### 사전 준비
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (또는 Docker Engine + Compose v2)
+- 포트 사용 가능 여부: `5432`, `6379`, `8080`, `9092`, `9094`, `80`(scale3)
+
+### 실행 방식 선택
+
+| 방식 | Compose 파일 | 용도 |
+|------|--------------|------|
+| **Full stack** | `docker-compose.yml` | 앱·DB·Redis·Kafka·Consumer를 컨테이너로 한 번에 실행 (k6·scale3 포함) |
+| **Infra only** | `docker-compose.infra.yml` | DB·Redis·Kafka만 Docker, 앱은 IDE/`./gradlew bootRun` |
+
+---
+
+### 1) Full stack — standard (기본)
+
+앱 + Postgres + Redis + Kafka + Consumer를 모두 컨테이너로 띄웁니다.
+
+```bash
+docker compose --profile single up -d --build
+./scripts/reset-standard.sh
+```
+
+동작 확인:
+
+```bash
+# 헬스체크
+curl http://localhost:8080/actuator/health
+
+# 이벤트 잔여 좌석 조회 (시드 데이터 event id=1)
+curl http://localhost:8080/api/v1/events/1
+
+# 예약 생성 (standard: 멱등·Outbox·Redis 재고 포함)
+curl -X POST http://localhost:8080/api/v1/reservations \
+  -H "Content-Type: application/json" \
+  -H "X-Idempotency-Key: test-key-1" \
+  -d '{"eventId": 1, "userId": "user-1"}'
+```
+
+종료:
+
+```bash
+docker compose --profile single down
+```
+
+---
+
+### 2) Full stack — basic (Lock Handler 비교)
+
+4종 락 전략(`NONE`, `OPTIMISTIC`, `PESSIMISTIC`, `REDIS`) 동작·k6 부하 비교용입니다.
+
+```bash
+APP_MODE=basic docker compose --profile single up -d --build
+./scripts/reset-basic.sh
+```
+
+락 전략 지정 예:
+
+```bash
+curl -X POST "http://localhost:8080/api/v1/reservations?lockStrategy=NONE" \
+  -H "Content-Type: application/json" \
+  -d '{"eventId": 1, "userId": "user-none-1"}'
+```
+
+k6 4종 비교 (컨테이너 내부에서 실행):
+
+```bash
+docker compose run --rm k6 run /scripts/benchmark/05-compare-all.js
+```
+
+---
+
+### 3) Infra only — IDE / bootRun
+
+인프라만 Docker로 띄우고 앱은 호스트에서 실행합니다. Kafka는 호스트 접근용 `localhost:9094` 리스너를 사용합니다.
+
+```bash
+docker compose -f docker-compose.infra.yml up -d
+cp .env.local .env   # IDE가 .env를 읽는 경우
+KAFKA_BOOTSTRAP_SERVERS=localhost:9094 ./gradlew bootRun
+```
+
+데이터 초기화 (infra compose 사용 시 `-f` 필요):
+
+```bash
+docker compose -f docker-compose.infra.yml exec postgres psql -U lab -d booking_system -c \
+  "UPDATE events SET reserved_count = 0, version = 0 WHERE id = 1;
+   TRUNCATE reservation_outbox, idempotency_records, reservations;"
+docker compose -f docker-compose.infra.yml exec redis redis-cli SET event:1:remaining 100
+```
+
+종료 (DB 볼륨까지 삭제):
+
+```bash
+docker compose -f docker-compose.infra.yml down -v
+```
+
+---
+
+### 4) Scale-out (API 3대 + Nginx)
+
+분산 락·로드밸런싱 실험:
+
+```bash
+docker compose --profile scale3 up -d --build
+./scripts/reset-standard.sh
+curl http://localhost/api/v1/events/1
+```
+
+k6 scale-out:
+
+```bash
+docker compose run --rm k6 run -e LOCK_STRATEGY=REDIS /scripts/benchmark/06-scale-out.js
+```
+
+---
+
+### 5) Kafka · Consumer 확인
+
+Full stack 기동 후 Consumer 로그:
+
+```bash
+docker compose logs -f reservation-consumer
+```
+
+Kafka 토픽 메시지 확인:
+
+```bash
+docker compose exec kafka kafka-console-consumer \
+  --bootstrap-server localhost:9092 \
+  --topic reservation.confirmed \
+  --from-beginning
+```
+
+> Infra only compose(`docker-compose.infra.yml`) 사용 시 bootstrap은 `localhost:9094`입니다.
+
+---
+
+### 6) 단위·통합 테스트 (Docker 불필요)
+
+Testcontainers가 Postgres·Redis를 자동 기동합니다.
+
+```bash
+./gradlew test
+```
+
+---
+
+### 트러블슈팅
+
+| 증상 | 확인 |
+|------|------|
+| `connection refused` (8080) | `docker compose ps` — `app` 컨테이너 기동 여부 |
+| Kafka 연결 실패 (bootRun) | `KAFKA_BOOTSTRAP_SERVERS=localhost:9094` 사용 여부 |
+| REDIS 전략만 실패 | `docker compose logs redis`, Redis 연결 설정 |
+| 포트 충돌 | 로컬 Postgres/Redis/Kafka가 이미 5432·6379·9092 사용 중인지 확인 |
+
+상세 시나리오: [`docs/test-scenarios.md`](docs/test-scenarios.md) · 코드베이스 가이드: [`AGENT.md`](AGENT.md)
 
 <br>
 <br>
