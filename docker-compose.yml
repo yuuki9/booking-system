@@ -18,6 +18,11 @@ x-app-depends: &app-depends
   kafka:
     condition: service_started
 
+x-app-build: &app-build
+  context: .
+  args:
+    MODULE: reservation-service
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -52,7 +57,7 @@ services:
       - "9092:9092"
 
   app:
-    build: .
+    build: *app-build
     environment:
       <<: *app-env
       LOCK_STRATEGY: OPTIMISTIC
@@ -65,7 +70,7 @@ services:
       - single
 
   app-1:
-    build: .
+    build: *app-build
     environment:
       <<: *app-env
       LOCK_STRATEGY: REDIS
@@ -76,7 +81,7 @@ services:
       - scale3
 
   app-2:
-    build: .
+    build: *app-build
     environment:
       <<: *app-env
       LOCK_STRATEGY: REDIS
@@ -87,7 +92,7 @@ services:
       - scale3
 
   app-3:
-    build: .
+    build: *app-build
     environment:
       <<: *app-env
       LOCK_STRATEGY: REDIS
@@ -111,7 +116,7 @@ services:
       - scale3
 
   reservation-consumer:
-    build: .
+    build: *app-build
     command: ["java", "-jar", "app.jar", "--spring.profiles.active=consumer"]
     environment:
       DB_HOST: postgres
