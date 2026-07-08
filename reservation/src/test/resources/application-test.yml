@@ -1,0 +1,12 @@
+app:
+  mode: basic
+
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 50
+
+logging:
+  level:
+    com.booking.reservation.service.lock: WARN
+    org.testcontainers: INFO

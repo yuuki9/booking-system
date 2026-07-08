@@ -7,7 +7,7 @@ plugins {
 }
 
 subprojects {
-    group = "com.lab"
+    group = "com.booking"
     version = "0.1.0"
 
     repositories {
@@ -16,13 +16,13 @@ subprojects {
 }
 
 tasks.register("test") {
-    dependsOn(":reservation-service:test")
+    dependsOn(":reservation:test")
 }
 
 tasks.register("build") {
-    dependsOn(":reservation-service:build")
+    dependsOn(":reservation:build")
 }
 
 tasks.register("bootRun") {
-    dependsOn(":reservation-service:bootRun")
+    dependsOn(":reservation:bootRun")
 }
