@@ -16,11 +16,11 @@ subprojects {
 }
 
 tasks.register("test") {
-    dependsOn(":reservation:test")
+    dependsOn(":reservation:test", ":payment:test")
 }
 
 tasks.register("build") {
-    dependsOn(":reservation:build")
+    dependsOn(":reservation:build", ":payment:build")
 }
 
 tasks.register("bootRun") {

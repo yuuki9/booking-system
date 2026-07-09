@@ -1,0 +1,12 @@
+payment:
+  gateway:
+    failure-rate: 0.0
+    timeout-rate: 0.0
+    delay-min-ms: 0
+    delay-max-ms: 0
+    timeout-ms: 50
+
+spring:
+  kafka:
+    listener:
+      auto-startup: false

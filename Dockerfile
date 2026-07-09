@@ -5,6 +5,7 @@ COPY gradlew build.gradle.kts settings.gradle.kts gradle.properties ./
 COPY gradle gradle
 COPY contracts contracts
 COPY reservation reservation
+COPY payment payment
 RUN chmod +x gradlew && ./gradlew :${MODULE}:bootJar -x test --no-daemon
 
 FROM eclipse-temurin:17-jre-alpine

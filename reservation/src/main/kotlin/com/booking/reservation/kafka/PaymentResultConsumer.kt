@@ -16,7 +16,7 @@ class PaymentResultConsumer(
 ) {
     @KafkaListener(
         topics = ["\${app.kafka.topic.payment-result}"],
-        groupId = "reservation-service",
+        groupId = "reservation",
     )
     fun consume(event: PaymentResultEvent) {
         when (event.status) {

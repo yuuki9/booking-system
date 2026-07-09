@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: payment
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:payment_db}
+    username: ${DB_USER:lab}
+    password: ${DB_PASSWORD:lab}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    consumer:
+      group-id: payment
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.booking.contracts
+
+app:
+  kafka:
+    topic:
+      reservation-pending: reservation.pending
+      payment-result: payment.result
+  outbox:
+    poll-interval-ms: 2000
+
+payment:
+  gateway:
+    failure-rate: ${PG_FAILURE_RATE:0.0}
+    timeout-rate: ${PG_TIMEOUT_RATE:0.0}
+    delay-min-ms: ${PG_DELAY_MIN_MS:50}
+    delay-max-ms: ${PG_DELAY_MAX_MS:200}
+    timeout-ms: ${PG_TIMEOUT_MS:3000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+server:
+  port: ${SERVER_PORT:8081}
