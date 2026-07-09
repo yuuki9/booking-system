@@ -1,12 +1,13 @@
-package com.booking.reservation.kafka
+package com.booking.contracts
 
 import java.time.Instant
 import java.util.UUID
 
-data class ReservationConfirmedEvent(
+data class ReservationPendingEvent(
     val reservationId: UUID,
     val eventId: Long,
     val userId: String,
+    val amount: Long,
     val lockStrategy: String,
-    val confirmedAt: Instant,
+    val occurredAt: Instant,
 )

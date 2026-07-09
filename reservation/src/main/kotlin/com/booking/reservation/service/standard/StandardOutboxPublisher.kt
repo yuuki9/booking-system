@@ -1,7 +1,7 @@
 package com.booking.reservation.service.standard
 
 import com.booking.reservation.config.AppModeProperties
-import com.booking.reservation.kafka.ReservationConfirmedEvent
+import com.booking.contracts.ReservationConfirmedEvent
 import com.booking.reservation.kafka.ReservationEventPublisher
 import com.booking.reservation.repository.ReservationOutboxRepository
 import org.slf4j.LoggerFactory

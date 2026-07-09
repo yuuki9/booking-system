@@ -6,7 +6,7 @@ import com.booking.reservation.domain.LockStrategy
 import com.booking.reservation.domain.Reservation
 import com.booking.reservation.exception.DuplicateReservationException
 import com.booking.reservation.exception.ReservationNotFoundException
-import com.booking.reservation.kafka.ReservationConfirmedEvent
+import com.booking.contracts.ReservationConfirmedEvent
 import com.booking.reservation.kafka.ReservationEventPublisher
 import com.booking.reservation.repository.EventRepository
 import com.booking.reservation.repository.IdempotencyRecordRepository

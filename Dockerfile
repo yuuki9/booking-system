@@ -3,6 +3,7 @@ ARG MODULE=reservation
 WORKDIR /app
 COPY gradlew build.gradle.kts settings.gradle.kts gradle.properties ./
 COPY gradle gradle
+COPY contracts contracts
 COPY reservation reservation
 RUN chmod +x gradlew && ./gradlew :${MODULE}:bootJar -x test --no-daemon
 

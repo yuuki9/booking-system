@@ -1,5 +1,6 @@
 package com.booking.reservation.kafka
 
+import com.booking.contracts.ReservationConfirmedEvent
 import org.slf4j.LoggerFactory
 import org.springframework.context.annotation.Profile
 import org.springframework.kafka.annotation.KafkaListener

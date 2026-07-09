@@ -30,8 +30,7 @@ spring:
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
-        spring.json.trusted.packages: com.booking.reservation.kafka
-        spring.json.value.default.type: com.booking.reservation.kafka.ReservationConfirmedEvent
+        spring.json.trusted.packages: com.booking.contracts
 
 app:
   mode: ${APP_MODE:standard}
