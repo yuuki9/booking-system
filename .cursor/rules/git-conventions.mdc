@@ -1,0 +1,59 @@
+---
+description: git commit·push·PR 컨벤션 (브랜치, 메시지, 체크리스트)
+alwaysApply: true
+---
+
+# Git 컨벤션
+
+원격 `https://github.com/yuuki9/booking-system.git` · 기본 브랜치 `main`
+
+사용자가 **커밋**, **푸시**, **PR**을 요청할 때 아래를 따릅니다.
+
+## 브랜치
+
+| 패턴 | 용도 |
+|------|------|
+| `feature/*` | 기능 |
+| `fix/*` | 버그 수정 |
+| `chore/*` | 설정·문서 |
+
+`main`에서 분기 → PR 머지
+
+## 커밋 메시지
+
+```
+type(scope): 한글 한 줄 설명
+```
+
+- type·scope: 영어 / 설명: 한글 (무엇을·왜)
+- 본문 필요 시 한 줄 띄우고 보강
+
+**type:** `feat` `fix` `refactor` `test` `docs` `chore`
+
+**scope:** `contracts` `reservation` `payment` `deploy` `bench` `docs` `repo`  
+여러 모듈 변경 시 핵심 모듈 하나만. Phase 작업은 설명에 Phase 번호 포함 가능.
+
+**예시**
+- `feat(reservation): Phase 2 결제 Saga 지원 (PAYMENT_ENABLED 플래그)`
+- `fix(contracts): PaymentResultEvent 역직렬화 수정`
+
+## 커밋 절차
+
+1. `git status` · `git diff` · `git log -3` 확인
+2. 사용자 **명시 요청** 있을 때만 커밋 (임의 커밋 금지)
+3. `./gradlew test` 통과 확인
+4. 비밀키·`build/`·`.gradle/` 미포함
+
+## 푸시
+
+- `main` force push 금지 (명시 요청 없을 때)
+- 푸시 후 `git status`로 동기화 확인
+
+## PR
+
+- `.github/PULL_REQUEST_TEMPLATE.md` 참고
+- 동작 변경 시 검증 방법 기록
+
+## 태그
+
+릴리스 시에만 `v0.1.0`. 일상 커밋마다 태그하지 않음.
