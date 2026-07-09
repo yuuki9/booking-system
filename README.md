@@ -4,21 +4,37 @@
 
 이벤트마다 받을 수 있는 최대 인원(`capacity`)이 있고, 예약이 하나 들어올 때마다 남은 자리는 하나씩 줄어듭니다.  
 같은 상황에서도 **예약을 처리하는 방법**을 여러 가지로 바꿔 보며, 어떤 방식이 더 안정적인지 비교해 볼 수 있습니다.
-## System Architecture
+## System Architecture (standard + 결제 Saga)
 
-![동시성 예약 시스템 아키텍처](docs/architecture.png)
+Compose 기본 경로(`APP_MODE=standard`, `PAYMENT_ENABLED=true`) 기준입니다.
 
-k6/클라이언트 → Nginx → API 서버 3대 → PostgreSQL · Redis · Kafka.  
+```mermaid
+flowchart LR
+  Client["Client / k6"] --> Reservation["reservation :8080"]
+  Reservation --> BookingDB[("PostgreSQL<br/>booking_system")]
+  Reservation --> Redis[("Redis<br/>선차감 · 분산락")]
+  Reservation <--> Kafka[["Kafka"]]
+  Payment["payment :8081"] <--> Kafka
+  Payment --> PaymentDB[("PostgreSQL<br/>payment_db")]
+  Kafka --> Consumer["reservation-consumer<br/>confirmed 로그"]
+```
 
+| 구성요소 | 역할 |
+|----------|------|
+| **reservation** | 멱등·중복검사·재고·락·Outbox·Saga 소비·reaper |
+| **payment** | Mock PG · `payment_db` · `payment.result` Outbox |
+| **Kafka** | `reservation.pending` / `payment.result` / `reservation.confirmed` |
+| **Redis** | reservation만 사용 (재고 선차감 · `REDIS` 전략 시 분산 락) |
+| **contracts** | 위 이벤트 DTO만 공유 (도메인/DB 공유 없음) |
+
+**scale-out (`--profile scale3`):** Nginx 뒤에 reservation API 3대. 인프라 스케일 뷰는 [`docs/architecture.png`](docs/architecture.png) (단일 API 시대 다이어그램 — payment 미반영).
 
 | 모드 | 환경변수 | 목적 |
 |------|----------|------|
-| **basic** | `APP_MODE=basic` | 의도적으로 단순화한 비교용 실행 모드 (4종 Lock Handler → DB → Kafka) |
-| **standard** (기본) | `APP_MODE=standard` | 실무형 시나리오 검증 **AWS 환경에서 구동** |
+| **standard** (기본) | `APP_MODE=standard` | 운영형 — 멱등·Outbox·Redis 선차감·(Compose) 결제 Saga |
+| **basic** | `APP_MODE=basic` | 락 4종 비교 실험실 (멱등/Outbox/결제 없음) |
 
-Docker Compose full stack(`docker-compose.yml`)에서는 **`PAYMENT_ENABLED=true`** 로 결제 Saga가 활성화됩니다. 예약 생성 시 `PENDING_PAYMENT` → Mock PG 결제 → `CONFIRMED` / 실패 시 보상(`CANCELLED` + 좌석 반환) 흐름을 `payment` 서비스(8081)와 함께 재현할 수 있습니다.
-
-### 결제 Saga 아키텍처 (Compose)
+### 결제 Saga 흐름
 
 ```mermaid
 sequenceDiagram
@@ -42,9 +58,9 @@ sequenceDiagram
     end
 ```
 
-**서비스 분리 근거:** 예약은 자기 DB 안에서 정합성(락·재고)을 지키고, 결제는 통제 불가능한 외부(PG)와 통신한다. 트랜잭션 경계·실패 모델이 달라 **choreography Saga + 보상 트랜잭션**으로 묶는다. 공유는 `contracts` 모듈(Kafka 이벤트 DTO)만 허용한다.
+**서비스 분리 근거:** 예약은 자기 DB 안에서 정합성(락·재고)을 지키고, 결제는 통제 불가능한 외부(PG)와 통신한다. 트랜잭션 경계·실패 모델이 달라 **choreography Saga + 보상 트랜잭션**으로 묶는다.
 
-**알려진 한계:** `PENDING_PAYMENT` reaper가 먼저 취소한 뒤 늦은 `payment.result(APPROVED)`가 도착하면 좌석은 없는데 결제만 성공한 드문 불일치가 생길 수 있다. 실무에서는 payment 쪽 환불 보상 이벤트가 필요하다.
+**알려진 한계:** reaper가 먼저 `CANCELLED`로 만든 뒤 늦은 `APPROVED`가 오면 결제만 성공·좌석은 없는 드문 불일치가 생길 수 있다. 실무에서는 payment 환불 보상이 필요하다.
 
 설계 상세: [`docs/superpowers/specs/2026-07-08-payment-saga-msa-design.md`](docs/superpowers/specs/2026-07-08-payment-saga-msa-design.md)
 

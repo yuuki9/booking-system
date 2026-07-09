@@ -52,7 +52,8 @@ Client / k6
          Kafka ──▶ reservation-consumer (reservation.confirmed 로그 데모)
 ```
 
-아키텍처 다이어그램: [`docs/architecture.png`](docs/architecture.png)  
+현재 구조 다이어그램: [`README.md`](README.md) (standard + Saga mermaid).  
+구 scale-out 인프라 뷰(payment 미반영): [`docs/architecture.png`](docs/architecture.png)  
 Saga 설계: [`docs/superpowers/specs/2026-07-08-payment-saga-msa-design.md`](docs/superpowers/specs/2026-07-08-payment-saga-msa-design.md)
 
 ---
