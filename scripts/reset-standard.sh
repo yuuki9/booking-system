@@ -8,4 +8,7 @@ docker compose exec postgres psql -U lab -d booking_system -c \
 
 docker compose exec redis redis-cli SET event:1:remaining 100
 
-echo "standard reset complete (DB + Redis inventory)."
+docker compose exec postgres psql -U lab -d payment_db -c \
+  "TRUNCATE payments, payment_outbox;" || true
+
+echo "standard reset complete (DB + Redis inventory + payment_db)."

@@ -1,6 +1,7 @@
 x-app-env: &app-env
   SPRING_PROFILES_ACTIVE: api
   APP_MODE: standard
+  PAYMENT_ENABLED: "true"
   DB_HOST: postgres
   DB_PORT: 5432
   DB_NAME: booking_system
@@ -37,6 +38,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    volumes:
+      - ./scripts/db/init-payment-db.sh:/docker-entrypoint-initdb.d/init-payment-db.sh:ro
 
   redis:
     image: redis:7-alpine
@@ -100,6 +103,32 @@ services:
     depends_on:
       <<: *app-depends
     profiles:
+      - scale3
+
+  payment:
+    build:
+      context: .
+      args:
+        MODULE: payment
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: payment_db
+      DB_USER: lab
+      DB_PASSWORD: lab
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SERVER_PORT: 8081
+      PG_FAILURE_RATE: "0.0"
+      PG_TIMEOUT_RATE: "0.0"
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    profiles:
+      - single
       - scale3
 
   nginx:

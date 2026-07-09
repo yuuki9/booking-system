@@ -6,4 +6,9 @@ docker compose exec postgres psql -U lab -d booking_system -c `
 
 docker compose exec redis redis-cli SET event:1:remaining 100
 
-Write-Host "standard reset complete (DB + Redis inventory)."
+docker compose exec postgres psql -U lab -d payment_db -c "TRUNCATE payments, payment_outbox;" 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "payment_db reset skipped (database or tables may not exist yet)"
+}
+
+Write-Host "standard reset complete (DB + Redis inventory + payment_db)."
