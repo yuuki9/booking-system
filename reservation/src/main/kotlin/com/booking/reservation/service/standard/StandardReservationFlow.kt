@@ -23,7 +23,32 @@ import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 
 /**
- * standard 모드: 멱등 → 중복검사 → Redis 선차감 → Lock Handler → Outbox → (폴러→Kafka)
+ * standard 모드 예약 생성 파이프라인.
+ *
+ * ## 선제 개념
+ * - **멱등(Idempotency)**: 클라이언트 재시도가 이중 예약을 만들지 않게 `X-Idempotency-Key` → 기존 예약 반환.
+ *   저장 시점 스냅샷이 아니라 **현재 status**를 읽는다 (PENDING → 이후 CONFIRMED replay 가능).
+ * - **Optimistic inventory (Redis 선차감)**: DB 락 전에 Redis에서 빠르게 거절해 핫 경로 부하를 줄인다.
+ *   최종 정합은 LockHandler + DB `reserved_count`가 담당 (Redis는 힌트 + 선필터).
+ * - **Transactional Outbox**: 같은 DB TX에 예약 + outbox 행을 넣고, 폴러가 Kafka로 발행.
+ *   “DB 커밋 후 Kafka 실패”로 인한 유실을 막는다 (at-least-once + 소비자 멱등).
+ *
+ * ## 작업 흐름
+ * ```
+ * 멱등 replay?
+ *   → 중복 (eventId, userId)?
+ *   → Redis DECR (선택)
+ *   → LockHandler.reserve(initialStatus = PENDING_PAYMENT | CONFIRMED)
+ *   → Outbox PENDING | CONFIRMED (또는 outbox off면 직접 publish)
+ *   → 멱등키 저장
+ * 실패 시 Redis INCR 보상
+ * ```
+ *
+ * ## 트레이드오프
+ * - **PAYMENT_ENABLED**: off면 기존처럼 즉시 CONFIRMED (벤치마크·회귀 보존).
+ *   on이면 PENDING만 만들고 확정은 Saga가 담당 → API는 201 + 폴링 모델.
+ * - **Redis 선차감 + DB 락 이중화**: 성능↑, 운영 복잡도↑ (키 미초기화·드리프트 가능 → syncFromDatabase).
+ * - **사전 중복검사 + UNIQUE 제약**: TOCTOU 레이스는 UK가 최종 방어. 검사는 UX용 빠른 409.
  */
 @Component
 @ConditionalOnProperty(name = ["app.mode"], havingValue = "standard", matchIfMissing = true)
@@ -73,6 +98,7 @@ class StandardReservationFlow(
                 remainingCapacity = event.remainingCapacity,
             )
         } catch (ex: Exception) {
+            // DB 실패 시 Redis만 앞서 줄었을 수 있음 → 보상. (Saga 보상과 별개의 로컬 보상)
             if (redisDecremented) {
                 redisInventoryService.rollback(eventId)
                 log.debug("Redis inventory compensated eventId={} reason={}", eventId, ex.javaClass.simpleName)
@@ -124,6 +150,7 @@ class StandardReservationFlow(
             return
         }
 
+        // Outbox off: 동일 TX에서 직접 publish (랩/디버그용). 프로덕션은 outbox 권장.
         if (paymentEnabled) {
             reservationEventPublisher.publishPending(
                 ReservationPendingEvent(

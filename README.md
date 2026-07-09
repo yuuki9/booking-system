@@ -16,6 +16,38 @@ k6/클라이언트 → Nginx → API 서버 3대 → PostgreSQL · Redis · Kafk
 | **basic** | `APP_MODE=basic` | 의도적으로 단순화한 비교용 실행 모드 (4종 Lock Handler → DB → Kafka) |
 | **standard** (기본) | `APP_MODE=standard` | 실무형 시나리오 검증 **AWS 환경에서 구동** |
 
+Docker Compose full stack(`docker-compose.yml`)에서는 **`PAYMENT_ENABLED=true`** 로 결제 Saga가 활성화됩니다. 예약 생성 시 `PENDING_PAYMENT` → Mock PG 결제 → `CONFIRMED` / 실패 시 보상(`CANCELLED` + 좌석 반환) 흐름을 `payment` 서비스(8081)와 함께 재현할 수 있습니다.
+
+### 결제 Saga 아키텍처 (Compose)
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant R as reservation:8080
+    participant K as Kafka
+    participant P as payment:8081
+
+    C->>R: POST /reservations
+    R-->>C: 201 PENDING_PAYMENT
+    R->>K: reservation.pending (Outbox)
+    K->>P: consume pending
+    P->>P: Mock PG
+    P->>K: payment.result
+    K->>R: consume result
+    alt APPROVED
+        R->>R: CONFIRMED + Outbox
+        R->>K: reservation.confirmed
+    else FAILED / TIMEOUT
+        R->>R: CANCELLED + 좌석 반환
+    end
+```
+
+**서비스 분리 근거:** 예약은 자기 DB 안에서 정합성(락·재고)을 지키고, 결제는 통제 불가능한 외부(PG)와 통신한다. 트랜잭션 경계·실패 모델이 달라 **choreography Saga + 보상 트랜잭션**으로 묶는다. 공유는 `contracts` 모듈(Kafka 이벤트 DTO)만 허용한다.
+
+**알려진 한계:** `PENDING_PAYMENT` reaper가 먼저 취소한 뒤 늦은 `payment.result(APPROVED)`가 도착하면 좌석은 없는데 결제만 성공한 드문 불일치가 생길 수 있다. 실무에서는 payment 쪽 환불 보상 이벤트가 필요하다.
+
+설계 상세: [`docs/superpowers/specs/2026-07-08-payment-saga-msa-design.md`](docs/superpowers/specs/2026-07-08-payment-saga-msa-design.md)
+
 ## Docker 환경에서 테스트하기
 
 ### 사전 준비
@@ -55,6 +87,37 @@ curl -X POST http://localhost:8080/api/v1/reservations \
   -H "Content-Type: application/json" \
   -H "X-Idempotency-Key: test-key-1" \
   -d '{"eventId": 1, "userId": "user-1"}'
+# PAYMENT_ENABLED=true → status=PENDING_PAYMENT, 수 초 후 GET으로 CONFIRMED 확인
+```
+
+Saga E2E (happy path / 결제 거절 / PG 타임아웃):
+
+```bash
+# happy path — PENDING_PAYMENT → CONFIRMED
+curl -X POST http://localhost:8080/api/v1/reservations \
+  -H "Content-Type: application/json" -H "X-Idempotency-Key: saga-1" \
+  -d '{"eventId": 1, "userId": "user-saga-1"}'
+curl http://localhost:8080/api/v1/reservations/{id}
+
+# 결제 거절 — userId fail- prefix → CANCELLED + 좌석 반환
+curl -X POST http://localhost:8080/api/v1/reservations \
+  -H "Content-Type: application/json" \
+  -d '{"eventId": 1, "userId": "fail-user-1"}'
+
+# PG 타임아웃 — userId timeout- prefix → FAILED(TIMEOUT) → CANCELLED
+curl -X POST http://localhost:8080/api/v1/reservations \
+  -H "Content-Type: application/json" \
+  -d '{"eventId": 1, "userId": "timeout-user-1"}'
+```
+
+k6 결제 Saga (Compose 기동 후):
+
+```bash
+docker compose run --rm k6 run /scripts/standard/payment-saga.js
+
+# 결제 실패 30% 재고 정합
+PG_FAILURE_RATE=0.3 docker compose up -d --no-deps --build payment
+docker compose run --rm k6 run /scripts/standard/payment-failure.js
 ```
 
 종료:
@@ -210,5 +273,9 @@ Testcontainers가 Postgres·Redis를 자동 기동합니다.
 |----------|------|-----|-----|------|
 | **capacity** | 500 동시 · REDIS | 100 | 400 | ✅ 예약 준수 |
 | **duplicate-user** | **같은 userId** 10회 | 1 | 9 | ✅ 1인 1예약 |
+| **payment-saga** | 200 동시 · Saga on | 100 | 100 | ✅ 정착 후 reservedCount=100 |
+| **payment-failure** | 200 동시 · PG_FAILURE_RATE=0.3 | 100 | 100 | ✅ 실패분 좌석 반환 · DB 정합 |
+
+> payment-saga / payment-failure는 로컬 Docker Compose(`PAYMENT_ENABLED=true`) 기준. 실패 시나리오는 `integrity=PASS`(reservedCount + remainingCapacity = capacity)로 재고 정합을 확인한다.
 
 

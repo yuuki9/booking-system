@@ -11,13 +11,26 @@
 | | basic | standard |
 |---|-----------|----------|
 | **역할** | 락 Handler 기본 동작 | 실제 운영 |
-| **목적** | 4종 Lock Handler → DB → Kafka (동작 검증·k6 실험) | 멱등·중복 방지·Outbox 등 **프로덕션 하드닝** |
+| **목적** | 4종 Lock Handler → DB → Kafka (동작 검증·k6 실험) | 멱등·중복 방지·Outbox·결제 Saga |
 | **구현** | `BasicReservationFlow` | `StandardReservationFlow` |
 
-- **basic** — `NONE`, `OPTIMISTIC`, `PESSIMISTIC`, `REDIS` Handler 동작만 노출합니다. 멱등·Outbox·Redis 선차감은 **의도적으로 제외**합니다.
+- **basic** — `NONE`, `OPTIMISTIC`, `PESSIMISTIC`, `REDIS` Handler 동작만 노출합니다. 멱등·Outbox·Redis 선차감·결제는 **의도적으로 제외**합니다.
 - **standard** — 실제 서비스에 가까운 코드입니다. 재전송 대응, 중복 예약 차단, 재고 선차감, DB 커밋과 Kafka 발행 분리(Outbox)를 포함합니다.
+- **결제 Saga** — `PAYMENT_ENABLED=true`(Compose 기본)일 때 예약·결제를 분리하고 Kafka choreography로 상태를 맞춥니다.
 
 기술 스택: **Kotlin**, **Spring Boot 3.4**, **PostgreSQL**, **Redis**, **Kafka**, **Flyway**, **Docker Compose**, **k6**(부하 테스트)
+
+---
+
+## Gradle 멀티 모듈
+
+| 모듈 | 포트(Compose) | DB | 역할 |
+|------|---------------|-----|------|
+| `contracts` | — | — | Kafka 이벤트 DTO만 공유 |
+| `reservation` | 8080 | `booking_system` | 예약·Outbox·Saga 소비·reaper |
+| `payment` | 8081 | `payment_db` | Mock PG·결제 Outbox |
+
+서비스 간 **동기 HTTP 호출 없음**. Kafka 토픽: `reservation.pending`, `payment.result`, `reservation.confirmed`.
 
 ---
 
@@ -29,18 +42,18 @@ Client / k6
     ▼
  Nginx (scale3 프로필)
     │
-    ▼
- API 서버 (1~3대)
+    ├── reservation (8080) ── booking_system DB, Redis
+    │       reservation.pending ──▶ payment
+    │       ◀── payment.result
     │
-    ├── PostgreSQL  (events, reservations, outbox, idempotency)
-    ├── Redis       (분산 락, standard 모드 재고 선차감)
-    └── Kafka       (reservation.confirmed 이벤트)
+    └── payment (8081) ── payment_db
             │
             ▼
-     reservation-consumer (별도 프로세스)
+         Kafka ──▶ reservation-consumer (reservation.confirmed 로그 데모)
 ```
 
-아키텍처 다이어그램: [`docs/architecture.png`](docs/architecture.png)
+아키텍처 다이어그램: [`docs/architecture.png`](docs/architecture.png)  
+Saga 설계: [`docs/superpowers/specs/2026-07-08-payment-saga-msa-design.md`](docs/superpowers/specs/2026-07-08-payment-saga-msa-design.md)
 
 ---
 
@@ -52,7 +65,14 @@ Client / k6
 | **basic** | `APP_MODE=basic` | **기본 Flow** — Lock Handler 동작 검증·k6 실험 |
 | **aws** (Spring profile) | `SPRING_PROFILES_ACTIVE=aws` | **AWS 배포** — standard + RDS SSL·MSK pre-provisioned topic |
 
-`APP_MODE`에 따라 `ReservationCreationFlow` 구현체가 `@ConditionalOnProperty`로 하나만 활성화됩니다. basic은 Handler 검증용 단순 경로, standard는 배포 대상 경로입니다.
+`APP_MODE`에 따라 `ReservationCreationFlow` 구현체가 `@ConditionalOnProperty`로 하나만 활성화됩니다.
+
+**결제 플래그:** `PAYMENT_ENABLED` (기본 `false`, Compose `true`)
+
+| | `false` | `true` |
+|---|---------|--------|
+| 예약 생성 status | `CONFIRMED` | `PENDING_PAYMENT` |
+| Outbox | `CONFIRMED` → `reservation.confirmed` | `PENDING` → `reservation.pending` |
 
 ---
 
@@ -71,7 +91,7 @@ Client / k6
 
 ## 예약 생성 흐름
 
-### standard 모드
+### standard 모드 (결제 off)
 
 ```
 POST /api/v1/reservations
@@ -79,8 +99,21 @@ POST /api/v1/reservations
   → 중복 사용자 검사
   → Redis 재고 선차감 (선택적)
   → ReservationLockExecutor → LockHandler
-  → Outbox 적재 (또는 Kafka 직접 publish)
+  → Outbox 적재 (CONFIRMED)
   → 멱등 키 저장
+```
+
+### standard + PAYMENT_ENABLED (Saga)
+
+```
+POST /api/v1/reservations
+  → (위와 동일 전처리)
+  → reserve(..., initialStatus=PENDING_PAYMENT)
+  → Outbox PENDING → reservation.pending
+  → payment: Mock PG → payment.result
+  → APPROVED: CONFIRMED + reservation.confirmed Outbox
+  → FAILED: CANCELLED + DB/Redis 좌석 반환 (보상)
+  → reaper: payment.result 유실 시 timeout 후 동일 보상
 ```
 
 Outbox는 `StandardOutboxPublisher`가 폴링하여 Kafka로 발행합니다.
@@ -99,33 +132,15 @@ POST /api/v1/reservations
 
 ```
 booking-system/
-├── src/main/kotlin/com/lab/reservation/
-│   ├── BookingSystemApplication.kt   # 진입점
-│   ├── api/                            # REST Controller, DTO, 예외 처리
-│   ├── config/                         # AppMode, Redis, Kafka, 초기 데이터
-│   ├── domain/                         # JPA 엔티티, LockStrategy enum
-│   ├── exception/                      # 도메인 예외
-│   ├── kafka/                          # 이벤트 publish/consume
-│   ├── repository/                     # Spring Data JPA
-│   └── service/
-│       ├── ReservationService.kt       # 예약 조회·생성 진입
-│       ├── ReservationCreationFlow.kt  # 모드별 Flow 인터페이스
-│       ├── ReservationLockExecutor.kt  # LockHandler 라우팅
-│       ├── LockStrategyResolver.kt
-│       ├── lock/                       # 4종 LockHandler 구현
-│       ├── basic/                      # basic 모드 Flow
-│       └── standard/                   # standard 모드 전용 (Outbox, Redis 재고)
-├── src/main/resources/
-│   ├── application.yml
-│   └── db/migration/                   # Flyway (V1 init, V2 hardening)
-├── src/test/kotlin/com/lab/reservation/integration/lock/  # 락 전략 동시성 통합 테스트
+├── contracts/          # Kafka 이벤트 DTO
+├── reservation/        # 예약 서비스 (main 앱 MODULE=reservation)
+├── payment/            # 결제 서비스 (MODULE=payment)
 ├── scripts/
-│   ├── reset-*.sh / *.ps1              # DB·Redis 초기화
-│   └── k6/                             # 부하 테스트 스크립트
-├── docker-compose.yml                  # postgres, redis, kafka, app, nginx, k6
-├── nginx/                              # scale3 로드밸런싱 설정
-├── docs/                               # 아키텍처 문서
-└── README.md                           # 사용자용 실행 가이드
+│   ├── reset-*.sh / *.ps1
+│   └── k6/             # benchmark/, standard/ (payment-saga, payment-failure)
+├── docker-compose.yml
+├── Dockerfile          # ARG MODULE
+└── docs/
 ```
 
 ---
@@ -135,7 +150,7 @@ booking-system/
 | Method | Path | 설명 |
 |--------|------|------|
 | `POST` | `/api/v1/reservations` | 예약 생성 |
-| `GET` | `/api/v1/reservations/{id}` | 예약 조회 |
+| `GET` | `/api/v1/reservations/{id}` | 예약 조회 (Saga 폴링) |
 | `GET` | `/api/v1/events/{id}` | 이벤트(잔여 좌석) 조회 |
 
 **standard 모드 헤더**
@@ -148,23 +163,21 @@ booking-system/
 ## 로컬 실행
 
 ```bash
-# standard (기본)
+# standard + payment Saga (Compose 기본)
 docker compose --profile single up -d --build
 ./scripts/reset-standard.sh
 
 # basic — Lock Handler 동작 + k6 부하 비교
 APP_MODE=basic docker compose --profile single up -d --build
 ./scripts/reset-basic.sh
-docker compose run --rm k6 run /scripts/benchmark/05-compare-all.js
+
+# k6 결제 Saga
+docker compose run --rm k6 run /scripts/standard/payment-saga.js
+PG_FAILURE_RATE=0.3 docker compose up -d --no-deps --build payment
+docker compose run --rm k6 run /scripts/standard/payment-failure.js
 
 # 3대 스케일아웃
 docker compose --profile scale3 up -d --build
-
-# AWS (standard, RDS · ElastiCache · MSK)
-SPRING_PROFILES_ACTIVE=aws \
-DB_HOST=... REDIS_HOST=... KAFKA_BOOTSTRAP_SERVERS=... \
-DB_USER=... DB_PASSWORD=... \
-java -jar app.jar
 ```
 
 테스트:
@@ -177,20 +190,29 @@ java -jar app.jar
 
 ## 데이터 모델 (요약)
 
+**booking_system (reservation)**
+
 | 테이블 | 용도 |
 |--------|------|
-| `events` | 이벤트, `capacity`, `reserved_count`, `version` |
-| `reservations` | 예약 (event_id + user_id 유니크) |
-| `reservation_outbox` | Kafka Outbox (standard) |
-| `idempotency_records` | 멱등 키 → reservation_id 매핑 |
+| `events` | 이벤트, `capacity`, `reserved_count`, `price` |
+| `reservations` | 예약 (`PENDING_PAYMENT` / `CONFIRMED` / `CANCELLED`) |
+| `reservation_outbox` | Kafka Outbox (`PENDING` / `CONFIRMED`) |
+| `idempotency_records` | 멱등 키 |
+
+**payment_db (payment)**
+
+| 테이블 | 용도 |
+|--------|------|
+| `payments` | 결제 시도 (reservation_id UNIQUE) |
+| `payment_outbox` | `payment.result` Outbox |
 
 ---
 
 ## 에이전트 작업 시 참고
 
-- **모드 변경**은 `app.mode` / `APP_MODE` 환경변수로 제어합니다. Flow 구현체를 직접 교체하지 않습니다.
-- **락 전략 추가** 시 `LockStrategy` enum + `ReservationLockHandler` 구현 + Spring Bean 등록이 필요합니다.
-- **standard 전용 기능**(Outbox, Redis 재고, 멱등)은 `service/standard/` 패키지에 모여 있습니다.
-- **부하 테스트**는 `scripts/k6/` 아래 benchmark·standard 스크립트를 사용합니다.
-- DB 스키마 변경은 Flyway migration(`src/main/resources/db/migration/`)으로만 반영합니다.
-- 사용자 대상 실행 설명은 [`README.md`](README.md)를, 이 파일은 **코드베이스 내비게이션**용입니다.
+- **basic 모드**(`BasicReservationFlow`, `service/basic/`, `service/lock/`)는 결제 Saga 작업 시 **수정 금지**.
+- **모드 변경**은 `app.mode` / `APP_MODE` 환경변수로 제어합니다.
+- **standard 전용 기능**은 `reservation/.../service/standard/`에 모입니다 (`StandardPaymentSagaService`, `StandardPendingReservationReaper` 등).
+- **부하 테스트**는 `scripts/k6/` — benchmark(basic), standard(Saga 포함).
+- DB 스키마 변경은 각 모듈 Flyway migration으로만 반영합니다.
+- 사용자 대상 실행 설명은 [`README.md`](README.md)를 참고하세요.

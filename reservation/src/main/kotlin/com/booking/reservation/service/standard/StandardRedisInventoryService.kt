@@ -10,9 +10,27 @@ import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
 
 /**
- * standard 모드: Redis 재고 선차감.
+ * Redis 기반 재고 선차감 (hot-path 필터).
  *
- * Redis 키: event:{eventId}:remaining
+ * ## 선제 개념
+ * - **선차감(pre-decrement)**: DB 락/트랜잭션 전에 원자적 DECR로 “이미 매진”을 빠르게 거절한다.
+ * - **최종 정합은 DB**: Redis는 캐시·힌트. LockHandler가 `events.reserved_count`를 올린다.
+ *   Saga 보상·로컬 실패 시 [rollback](INCR)으로 Redis를 DB에 다시 맞춘다.
+ * - **Lua 스크립트**: GET+분기+DECR을 한 라운드트립·원자 연산으로 (레이스 없는 sold-out 판정).
+ *
+ * ## 작업 흐름
+ * ```
+ * syncFromDatabase: remaining = capacity - reserved_count → SET
+ * tryDecrement:     Lua DECR if remaining > 0  else sold-out / not-initialized
+ * rollback:         INCR (예약 실패·결제 실패·reaper 보상)
+ * ```
+ *
+ * ## 트레이드오프
+ * - **성능 vs 일관성**: Redis 장애·키 누락 시 요청 실패(미초기화). DB만 쓰면 느리지만 단순.
+ * - **NONE 전략 skip**: 초과예약 실험(`shouldApply` false)에서는 선차감 안 함 — 의도적 오버부킹 재현.
+ * - **드리프트**: 보상 누락 시 Redis remaining과 DB가 어긋날 수 있음 → reset/sync 스크립트로 복구.
+ *
+ * Redis 키: `event:{eventId}:remaining`
  */
 @Service
 @ConditionalOnProperty(name = ["app.mode"], havingValue = "standard", matchIfMissing = true)

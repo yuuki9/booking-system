@@ -2,7 +2,7 @@
 
 - 작성일: 2026-07-08
 - 갱신일: 2026-07-09
-- 상태: 설계 확정 (Phase 0~2 완료, Phase 3~5 대기)
+- 상태: 설계 확정 (Phase 0~5 완료)
 - 대상 독자: 이 문서만 보고 구현하는 AI 에이전트 / 개발자
 - 관련 문서: `AGENT.md`, `docs/superpowers/specs/2026-06-10-reservation-concurrency-lab-design.md`
 

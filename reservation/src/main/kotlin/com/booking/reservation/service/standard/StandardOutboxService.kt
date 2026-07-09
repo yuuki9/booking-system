@@ -9,6 +9,22 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
+/**
+ * 예약 도메인 Outbox 적재 (Transactional Outbox 패턴의 “쓰기” 절반).
+ *
+ * ## 선제 개념
+ * - **Dual-write 문제**: 같은 요청에서 DB 커밋과 Kafka produce를 각각 하면 한쪽만 성공할 수 있다.
+ *   Outbox는 **비즈니스 행과 이벤트 행을 한 TX**에 넣어 원자성을 DB에 위임한다.
+ * - **발행은 비동기**: [StandardOutboxPublisher]가 unpublished 행을 폴링해 Kafka로 보낸다.
+ *
+ * ## 작업 흐름
+ * - [enqueue]: payment off 또는 Saga 승인 후 → `CONFIRMED` → 토픽 `reservation.confirmed`
+ * - [enqueuePending]: payment on 생성 시 → `PENDING` + amount → 토픽 `reservation.pending`
+ *
+ * ## 트레이드오프
+ * - **폴링 지연(기본 2s)**: E2E에서 PENDING→CONFIRMED까지 수 초 걸린다. 즉시성↓, 구현·운영 단순↑.
+ *   CDC(Debezium)는 지연↓·인프라 복잡도↑ — 이 랩에서는 폴링 선택.
+ */
 @Service
 @ConditionalOnProperty(name = ["app.mode"], havingValue = "standard", matchIfMissing = true)
 class StandardOutboxService(

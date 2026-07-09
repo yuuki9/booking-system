@@ -4,10 +4,16 @@ import com.booking.reservation.domain.LockStrategy
 import org.springframework.boot.context.properties.ConfigurationProperties
 
 /**
- * 애플리케이션 실행 모드 및 standard 모드 전용 기능 설정.
+ * 실행 모드 및 standard 하드닝 플래그.
  *
- * - basic: 4가지 락 Handler → DB → Kafka (락 동작 검증·k6 실험용)
- * - standard: 멱등·중복검사·Redis 선차감·Outbox (기본값)
+ * ## 선제 개념
+ * - **Feature flag로 하위 호환**: `payment.enabled=false`(기본)면 Phase 이전과 동일한
+ *   즉시 CONFIRMED 경로. 기존 k6·통합 테스트가 flag off로 통과해야 한다.
+ * - **basic vs standard**: 락 실험실과 운영 경로를 코드로 분리 (`@ConditionalOnProperty`).
+ *
+ * ## 트레이드오프 (payment)
+ * - [Payment.timeoutSeconds] (기본 60): Mock PG 최대 지연보다 커야 reaper가 정상 결제를 삼키지 않음.
+ * - [Payment.reaperIntervalMs] (기본 10s): 짧을수록 고아 회수 빠름, DB 폴링 부하↑.
  */
 @ConfigurationProperties(prefix = "app")
 data class AppModeProperties(
@@ -42,6 +48,11 @@ data class AppModeProperties(
             val pollIntervalMs: Long = 2_000,
         )
 
+        /**
+         * @property enabled env `PAYMENT_ENABLED`. Compose에서는 true.
+         * @property timeoutSeconds PENDING_PAYMENT 최대 대기 (reaper cutoff).
+         * @property reaperIntervalMs 고아 스캔 주기.
+         */
         data class Payment(
             val enabled: Boolean = false,
             val timeoutSeconds: Long = 60,

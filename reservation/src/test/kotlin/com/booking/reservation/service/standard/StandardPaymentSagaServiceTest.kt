@@ -107,6 +107,29 @@ class StandardPaymentSagaServiceTest {
         assertEquals(0, eventRepository.findById(reservation.eventId).orElseThrow().reservedCount)
     }
 
+    @Test
+    fun `compensateTimeout cancels pending reservation and rolls back redis when inventory enabled`() {
+        val reservation = seedPendingReservation()
+        jdbcTemplate.update("UPDATE events SET reserved_count = 1 WHERE id = ?", reservation.eventId)
+
+        sagaService.compensateTimeout(reservation.id, reservation.eventId)
+
+        assertEquals(ReservationStatus.CANCELLED, reservationRepository.findById(reservation.id).orElseThrow().status)
+        assertEquals(0, eventRepository.findById(reservation.eventId).orElseThrow().reservedCount)
+        assertEquals("1", redisTemplate.opsForValue().get("event:${reservation.eventId}:remaining"))
+    }
+
+    @Test
+    fun `compensateTimeout is no-op when reservation is already processed`() {
+        val reservation = seedPendingReservation()
+        jdbcTemplate.update("UPDATE events SET reserved_count = 1 WHERE id = ?", reservation.eventId)
+        sagaService.onFailed(paymentResult(reservation, PaymentResultStatus.FAILED))
+        sagaService.compensateTimeout(reservation.id, reservation.eventId)
+
+        assertEquals(ReservationStatus.CANCELLED, reservationRepository.findById(reservation.id).orElseThrow().status)
+        assertEquals(0, eventRepository.findById(reservation.eventId).orElseThrow().reservedCount)
+    }
+
     private fun seedPendingReservation(): Reservation {
         val event = eventRepository.findById(eventId()).orElseThrow()
         return reservationRepository.save(
