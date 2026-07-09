@@ -1,6 +1,7 @@
 package com.booking.reservation.service.standard
 
 import com.booking.reservation.domain.LockStrategy
+import com.booking.reservation.domain.OutboxEventType
 import com.booking.reservation.domain.Reservation
 import com.booking.reservation.domain.ReservationOutbox
 import com.booking.reservation.repository.ReservationOutboxRepository
@@ -21,6 +22,22 @@ class StandardOutboxService(
                 eventId = reservation.eventId,
                 userId = reservation.userId,
                 lockStrategy = lockStrategy.name,
+                eventType = OutboxEventType.CONFIRMED,
+                confirmedAt = reservation.createdAt,
+            ),
+        )
+    }
+
+    @Transactional
+    fun enqueuePending(reservation: Reservation, lockStrategy: LockStrategy, amount: Long) {
+        outboxRepository.save(
+            ReservationOutbox(
+                reservationId = reservation.id,
+                eventId = reservation.eventId,
+                userId = reservation.userId,
+                lockStrategy = lockStrategy.name,
+                eventType = OutboxEventType.PENDING,
+                amount = amount,
                 confirmedAt = reservation.createdAt,
             ),
         )

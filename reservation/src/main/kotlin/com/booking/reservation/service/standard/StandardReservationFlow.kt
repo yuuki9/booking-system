@@ -4,9 +4,11 @@ import com.booking.reservation.config.AppModeProperties
 import com.booking.reservation.domain.IdempotencyRecord
 import com.booking.reservation.domain.LockStrategy
 import com.booking.reservation.domain.Reservation
+import com.booking.reservation.domain.ReservationStatus
 import com.booking.reservation.exception.DuplicateReservationException
 import com.booking.reservation.exception.ReservationNotFoundException
 import com.booking.contracts.ReservationConfirmedEvent
+import com.booking.contracts.ReservationPendingEvent
 import com.booking.reservation.kafka.ReservationEventPublisher
 import com.booking.reservation.repository.EventRepository
 import com.booking.reservation.repository.IdempotencyRecordRepository
@@ -55,11 +57,16 @@ class StandardReservationFlow(
         }
 
         try {
-            val reservation = lockExecutor.reserve(eventId, userId, lockStrategy)
-            publishConfirmation(reservation, lockStrategy)
+            val initialStatus = if (appModeProperties.standard.payment.enabled) {
+                ReservationStatus.PENDING_PAYMENT
+            } else {
+                ReservationStatus.CONFIRMED
+            }
+            val reservation = lockExecutor.reserve(eventId, userId, lockStrategy, initialStatus)
+            val event = eventRepository.findById(eventId).orElseThrow()
+            publishAfterReserve(reservation, lockStrategy, event.price)
             saveIdempotencyKey(idempotencyKey, reservation)
 
-            val event = eventRepository.findById(eventId).orElseThrow()
             return ReservationResult(
                 reservation = reservation,
                 lockStrategy = lockStrategy,
@@ -106,9 +113,28 @@ class StandardReservationFlow(
         }
     }
 
-    private fun publishConfirmation(reservation: Reservation, lockStrategy: LockStrategy) {
+    private fun publishAfterReserve(reservation: Reservation, lockStrategy: LockStrategy, eventPrice: Long) {
+        val paymentEnabled = appModeProperties.standard.payment.enabled
         if (appModeProperties.standard.outbox.enabled) {
-            outboxService.enqueue(reservation, lockStrategy)
+            if (paymentEnabled) {
+                outboxService.enqueuePending(reservation, lockStrategy, eventPrice)
+            } else {
+                outboxService.enqueue(reservation, lockStrategy)
+            }
+            return
+        }
+
+        if (paymentEnabled) {
+            reservationEventPublisher.publishPending(
+                ReservationPendingEvent(
+                    reservationId = reservation.id,
+                    eventId = reservation.eventId,
+                    userId = reservation.userId,
+                    amount = eventPrice,
+                    lockStrategy = lockStrategy.name,
+                    occurredAt = reservation.createdAt,
+                ),
+            )
         } else {
             reservationEventPublisher.publish(
                 ReservationConfirmedEvent(

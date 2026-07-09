@@ -22,6 +22,7 @@ data class AppModeProperties(
         val duplicateCheck: DuplicateCheck = DuplicateCheck(),
         val redisInventory: RedisInventory = RedisInventory(),
         val outbox: Outbox = Outbox(),
+        val payment: Payment = Payment(),
     ) {
         data class DuplicateCheck(
             val enabled: Boolean = true,
@@ -39,6 +40,12 @@ data class AppModeProperties(
         data class Outbox(
             val enabled: Boolean = true,
             val pollIntervalMs: Long = 2_000,
+        )
+
+        data class Payment(
+            val enabled: Boolean = false,
+            val timeoutSeconds: Long = 60,
+            val reaperIntervalMs: Long = 10_000,
         )
     }
 }

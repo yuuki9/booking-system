@@ -2,6 +2,7 @@ package com.booking.reservation.service.lock
 
 import com.booking.reservation.domain.LockStrategy
 import com.booking.reservation.domain.Reservation
+import com.booking.reservation.domain.ReservationStatus
 import com.booking.reservation.exception.CapacityExceededException
 import com.booking.reservation.exception.EventNotFoundException
 import com.booking.reservation.exception.OptimisticLockConflictException
@@ -27,10 +28,10 @@ class OptimisticLockHandler(
 
     override val strategy: LockStrategy = LockStrategy.OPTIMISTIC
 
-    override fun reserve(eventId: Long, userId: String): Reservation {
+    override fun reserve(eventId: Long, userId: String, initialStatus: ReservationStatus): Reservation {
         repeat(MAX_ATTEMPTS) { attempt ->
             try {
-                return transactionTemplate.execute { tryReserveOnce(eventId, userId) }!!
+                return transactionTemplate.execute { tryReserveOnce(eventId, userId, initialStatus) }!!
             } catch (ex: CapacityExceededException) {
                 throw ex
             } catch (ex: OptimisticLockConflictException) {
@@ -55,7 +56,7 @@ class OptimisticLockHandler(
         throw OptimisticLockConflictException()
     }
 
-    private fun tryReserveOnce(eventId: Long, userId: String): Reservation {
+    private fun tryReserveOnce(eventId: Long, userId: String, initialStatus: ReservationStatus): Reservation {
         val event = eventRepository.findById(eventId).orElseThrow { EventNotFoundException(eventId) }
         if (event.reservedCount >= event.capacity) {
             log.warn("OPTIMISTIC capacity exceeded eventId={} reserved={}/{}", eventId, event.reservedCount, event.capacity)
@@ -69,7 +70,7 @@ class OptimisticLockHandler(
         } catch (_: ObjectOptimisticLockingFailureException) {
             throw OptimisticLockConflictException()
         }
-        return reservationRepository.save(Reservation(eventId = eventId, userId = userId))
+        return reservationRepository.save(Reservation(eventId = eventId, userId = userId, status = initialStatus))
     }
 
     companion object {

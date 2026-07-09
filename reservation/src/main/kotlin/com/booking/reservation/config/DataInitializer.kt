@@ -28,6 +28,7 @@ class DataInitializer(
                     name = "데모 공연",
                     capacity = 100,
                     reservedCount = 0,
+                    price = 10_000,
                 ),
             ).also {
                 log.info("Seeded test event id={} capacity={}", it.id, it.capacity)

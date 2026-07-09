@@ -2,6 +2,7 @@ package com.booking.reservation.service.lock
 
 import com.booking.reservation.domain.LockStrategy
 import com.booking.reservation.domain.Reservation
+import com.booking.reservation.domain.ReservationStatus
 import com.booking.reservation.exception.CapacityExceededException
 import com.booking.reservation.exception.DistributedLockFailedException
 import com.booking.reservation.exception.EventNotFoundException
@@ -28,7 +29,7 @@ class RedisLockHandler(
 
     override val strategy: LockStrategy = LockStrategy.REDIS
 
-    override fun reserve(eventId: Long, userId: String): Reservation {
+    override fun reserve(eventId: Long, userId: String, initialStatus: ReservationStatus): Reservation {
         val lock = redisLockRegistry.obtain("event-lock:$eventId")
         val lockWaitStart = System.nanoTime()
         val acquired = lock.tryLock(LOCK_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -57,7 +58,7 @@ class RedisLockHandler(
                 }
                 event.reservedCount++
                 eventRepository.save(event)
-                reservationRepository.save(Reservation(eventId = eventId, userId = userId))
+                reservationRepository.save(Reservation(eventId = eventId, userId = userId, status = initialStatus))
             }!!
         } finally {
             lock.unlock()

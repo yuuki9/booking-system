@@ -10,7 +10,9 @@ import java.time.Instant
 import java.util.UUID
 
 enum class ReservationStatus {
+    PENDING_PAYMENT,
     CONFIRMED,
+    CANCELLED,
 }
 
 @Entity

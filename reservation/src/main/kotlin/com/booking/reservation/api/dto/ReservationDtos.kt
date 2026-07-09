@@ -54,6 +54,7 @@ data class EventResponse(
     val capacity: Int,
     val reservedCount: Int,
     val remainingCapacity: Int,
+    val price: Long,
 ) {
     companion object {
         fun from(event: Event): EventResponse =
@@ -63,6 +64,7 @@ data class EventResponse(
                 capacity = event.capacity,
                 reservedCount = event.reservedCount,
                 remainingCapacity = event.remainingCapacity,
+                price = event.price,
             )
     }
 }

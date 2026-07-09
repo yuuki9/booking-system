@@ -2,6 +2,7 @@ package com.booking.reservation.service.lock
 
 import com.booking.reservation.domain.LockStrategy
 import com.booking.reservation.domain.Reservation
+import com.booking.reservation.domain.ReservationStatus
 import com.booking.reservation.exception.CapacityExceededException
 import com.booking.reservation.exception.EventNotFoundException
 import com.booking.reservation.repository.ReservationRepository
@@ -26,7 +27,11 @@ class NoneLockHandler(
     override val strategy: LockStrategy = LockStrategy.NONE
 
     @Transactional
-    override fun reserve(eventId: Long, userId: String): Reservation {
+    override fun reserve(
+        eventId: Long,
+        userId: String,
+        initialStatus: ReservationStatus,
+    ): Reservation {
         val counts = jdbcTemplate.query(
             "SELECT reserved_count, capacity FROM events WHERE id = ?",
             { rs, _ ->
@@ -45,6 +50,6 @@ class NoneLockHandler(
             "UPDATE events SET reserved_count = reserved_count + 1 WHERE id = ?",
             eventId,
         )
-        return reservationRepository.save(Reservation(eventId = eventId, userId = userId))
+        return reservationRepository.save(Reservation(eventId = eventId, userId = userId, status = initialStatus))
     }
 }

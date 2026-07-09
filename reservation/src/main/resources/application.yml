@@ -38,6 +38,8 @@ app:
   kafka:
     topic:
       reservation-confirmed: reservation.confirmed
+      reservation-pending: reservation.pending
+      payment-result: payment.result
   standard:
     duplicate-check:
       enabled: true
@@ -48,6 +50,10 @@ app:
     outbox:
       enabled: true
       poll-interval-ms: 2000
+    payment:
+      enabled: ${PAYMENT_ENABLED:false}
+      timeout-seconds: 60
+      reaper-interval-ms: 10000
 
 management:
   endpoints:

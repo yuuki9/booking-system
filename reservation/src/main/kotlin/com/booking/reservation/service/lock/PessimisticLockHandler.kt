@@ -2,6 +2,7 @@ package com.booking.reservation.service.lock
 
 import com.booking.reservation.domain.LockStrategy
 import com.booking.reservation.domain.Reservation
+import com.booking.reservation.domain.ReservationStatus
 import com.booking.reservation.exception.CapacityExceededException
 import com.booking.reservation.exception.EventNotFoundException
 import com.booking.reservation.repository.EventRepository
@@ -24,7 +25,7 @@ class PessimisticLockHandler(
     override val strategy: LockStrategy = LockStrategy.PESSIMISTIC
 
     @Transactional
-    override fun reserve(eventId: Long, userId: String): Reservation {
+    override fun reserve(eventId: Long, userId: String, initialStatus: ReservationStatus): Reservation {
         val lockWaitStart = System.nanoTime()
         val event = eventRepository.findByIdForUpdate(eventId).orElseThrow { EventNotFoundException(eventId) }
         val lockWaitMs = (System.nanoTime() - lockWaitStart) / 1_000_000
@@ -38,6 +39,6 @@ class PessimisticLockHandler(
         }
         event.reservedCount++
         eventRepository.save(event)
-        return reservationRepository.save(Reservation(eventId = eventId, userId = userId))
+        return reservationRepository.save(Reservation(eventId = eventId, userId = userId, status = initialStatus))
     }
 }

@@ -26,6 +26,9 @@ class Event(
 
     @Version
     var version: Long = 0,
+
+    @Column(nullable = false)
+    var price: Long = 10_000,
 ) {
     val remainingCapacity: Int
         get() = capacity - reservedCount

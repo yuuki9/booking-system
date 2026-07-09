@@ -31,6 +31,12 @@ class ReservationOutbox(
     @Column(name = "lock_strategy", nullable = false)
     val lockStrategy: String,
 
+    @Column(name = "event_type", nullable = false)
+    val eventType: String = OutboxEventType.CONFIRMED,
+
+    @Column(name = "amount")
+    val amount: Long? = null,
+
     @Column(name = "confirmed_at", nullable = false)
     val confirmedAt: Instant,
 

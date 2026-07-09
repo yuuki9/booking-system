@@ -2,6 +2,8 @@ package com.booking.reservation.service.standard
 
 import com.booking.reservation.config.AppModeProperties
 import com.booking.contracts.ReservationConfirmedEvent
+import com.booking.contracts.ReservationPendingEvent
+import com.booking.reservation.domain.OutboxEventType
 import com.booking.reservation.kafka.ReservationEventPublisher
 import com.booking.reservation.repository.ReservationOutboxRepository
 import org.slf4j.LoggerFactory
@@ -36,19 +38,38 @@ class StandardOutboxPublisher(
 
         pending.forEach { row ->
             try {
-                reservationEventPublisher.publish(
-                    ReservationConfirmedEvent(
-                        reservationId = row.reservationId,
-                        eventId = row.eventId,
-                        userId = row.userId,
-                        lockStrategy = row.lockStrategy,
-                        confirmedAt = row.confirmedAt,
-                    ),
-                )
+                when (row.eventType) {
+                    OutboxEventType.PENDING -> {
+                        val amount = row.amount
+                            ?: error("Outbox PENDING row missing amount reservationId=${row.reservationId}")
+                        reservationEventPublisher.publishPending(
+                            ReservationPendingEvent(
+                                reservationId = row.reservationId,
+                                eventId = row.eventId,
+                                userId = row.userId,
+                                amount = amount,
+                                lockStrategy = row.lockStrategy,
+                                occurredAt = row.confirmedAt,
+                            ),
+                        )
+                    }
+                    OutboxEventType.CONFIRMED -> {
+                        reservationEventPublisher.publish(
+                            ReservationConfirmedEvent(
+                                reservationId = row.reservationId,
+                                eventId = row.eventId,
+                                userId = row.userId,
+                                lockStrategy = row.lockStrategy,
+                                confirmedAt = row.confirmedAt,
+                            ),
+                        )
+                    }
+                    else -> error("Unknown outbox event_type=${row.eventType} reservationId=${row.reservationId}")
+                }
                 row.publishedAt = Instant.now()
-                log.debug("Outbox published reservationId={}", row.reservationId)
+                log.debug("Outbox published reservationId={} eventType={}", row.reservationId, row.eventType)
             } catch (ex: Exception) {
-                log.error("Outbox publish failed reservationId={}", row.reservationId, ex)
+                log.error("Outbox publish failed reservationId={} eventType={}", row.reservationId, row.eventType, ex)
             }
         }
     }
