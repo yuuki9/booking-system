@@ -1,5 +1,5 @@
 ---
-description: git commit·push·PR 컨벤션 (브랜치, 메시지, 체크리스트)
+description: git commit·push·PR 컨벤션 (실무형 한글 메시지)
 alwaysApply: true
 ---
 
@@ -15,34 +15,104 @@ alwaysApply: true
 |------|------|
 | `feature/*` | 기능 |
 | `fix/*` | 버그 수정 |
-| `chore/*` | 설정·문서 |
+| `chore/*` | 설정·문서·룰 |
 
-`main`에서 분기 → PR 머지
+`main`에서 분기 → PR 머지. 일상 작업도 가능하면 feature 브랜치 사용.
 
-## 커밋 메시지
+---
+
+## 커밋 메시지 (실무형)
+
+형식은 Conventional Commits, **제목·본문은 한글**.
 
 ```
-type(scope): 한글 한 줄 설명
+type(scope): 한글 제목
+
+(선택) 본문
 ```
 
-- type·scope: 영어 / 설명: 한글 (무엇을·왜)
-- 본문 필요 시 한 줄 띄우고 보강
+### 언어
 
-**type:** `feat` `fix` `refactor` `test` `docs` `chore`
+| | 규칙 |
+|---|------|
+| **한글 필수** | 제목 설명, 본문 전체 |
+| **영어 허용** | `type`, `scope`, 코드·모듈·환경변수·토픽명 (`PAYMENT_ENABLED`, `:payment`, `payment.result`) |
+| **금지** | 영어 제목/본문 (`add`, `integrate`, `fix bug` 등) |
 
-**scope:** `contracts` `reservation` `payment` `deploy` `bench` `docs` `repo`  
-여러 모듈 변경 시 핵심 모듈 하나만. Phase 작업은 설명에 Phase 번호 포함 가능.
+### 제목 규칙
 
-**예시**
-- `feat(reservation): Phase 2 결제 Saga 지원 (PAYMENT_ENABLED 플래그)`
-- `fix(contracts): PaymentResultEvent 역직렬화 수정`
+- **changelog에 남을 한 줄**로 쓴다. 파일·구현 나열이 아니라 **왜 / 결과**가 보이게.
+- **동사로 시작**한다. (추가, 수정, 분리, 통합, 제거, 개선, 정리…)
+- 50자 전후, **마침표 없음**, 한 줄만.
+- `Phase N`을 제목 **앞에 두지 않는다.** 필요하면 끝에 `(Phase 3)` 정도만.
+- 여러 모듈이면 **핵심 scope 하나**만.
+
+### 본문 규칙
+
+본문은 필요할 때만. 아래를 짧게:
+
+```
+- 변경 이유
+- 영향 범위 / 주의점 (마이그레이션, 플래그, 호환성)
+```
+
+파일 목록·diff 요약은 쓰지 않는다. Phase 번호·설계서 참조는 본문에 둔다.
+
+### type
+
+| type | 언제 |
+|------|------|
+| `feat` | 사용자/시스템 동작이 늘어남 |
+| `fix` | 버그 수정 |
+| `refactor` | 동작 동일, 구조만 변경 |
+| `test` | 테스트만 |
+| `docs` | 문서만 |
+| `chore` | 빌드·설정·룰·의존성 |
+
+### scope
+
+`contracts` `reservation` `payment` `deploy` `bench` `docs` `repo`
+
+### 예시 (✅ GOOD)
+
+```
+feat(payment): Mock PG와 Outbox로 결제 도메인 분리
+
+예약과 결제의 트랜잭션·실패 모델이 달라 서비스 경계를 나눔.
+PAYMENT_ENABLED로 기존 standard 동작은 유지. (Phase 3)
+```
+
+```
+feat(deploy): Compose에 payment를 붙여 Saga E2E 가능하게 함
+
+payment_db 초기화와 PAYMENT_ENABLED=true로
+PENDING_PAYMENT → CONFIRMED를 compose up만으로 재현. (Phase 4)
+```
+
+```
+feat(reservation): 결제 플래그 뒤에 Saga 승인·보상 경로 추가
+fix(contracts): PaymentResultEvent 역직렬화 실패 수정
+chore(repo): 커밋 메시지를 실무형 한글 컨벤션으로 정리
+```
+
+### 예시 (❌ BAD)
+
+```
+Phase 3: add payment module with mock PG gateway and Kafka outbox.
+feat(payment): Phase 3 payment 모듈 추가 (Mock PG·Kafka outbox)
+chore(repo): remove md files and add cursor rules
+feat(payment): Payment.kt, MockPaymentGateway, OutboxPublisher 추가
+```
+
+---
 
 ## 커밋 절차
 
 1. `git status` · `git diff` · `git log -3` 확인
 2. 사용자 **명시 요청** 있을 때만 커밋 (임의 커밋 금지)
-3. `./gradlew test` 통과 확인
+3. 동작 변경 시 `./gradlew test` (또는 관련 모듈 테스트) 통과 확인
 4. 비밀키·`build/`·`.gradle/` 미포함
+5. 메시지는 위 **실무형 한글** 규칙 준수
 
 ## 푸시
 
@@ -52,6 +122,7 @@ type(scope): 한글 한 줄 설명
 ## PR
 
 - `.github/PULL_REQUEST_TEMPLATE.md` 참고
+- 제목도 한글·결과 중심 (커밋과 동일 톤)
 - 동작 변경 시 검증 방법 기록
 
 ## 태그
