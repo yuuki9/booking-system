@@ -20,17 +20,10 @@ Kotlin · Spring Boot 3.4 · PostgreSQL · Redis · Kafka · Docker Compose · k
 
 ## 아키텍처 (한 장)
 
-Compose 기본: `APP_MODE=standard`, `PAYMENT_ENABLED=true`
+Compose 기본: `APP_MODE=standard`, `PAYMENT_ENABLED=true`  
+scale-out: Nginx → Reservation ×3, Payment ×3 (Kafka choreography)
 
-```mermaid
-flowchart LR
-  Client["Client / k6"] --> Reservation["reservation :8080"]
-  Reservation --> BookingDB[("booking_system")]
-  Reservation --> Redis[("Redis")]
-  Reservation <--> Kafka[["Kafka"]]
-  Payment["payment :8081"] <--> Kafka
-  Payment --> PaymentDB[("payment_db")]
-```
+![분산 아키텍처](docs/distributed-architecture.png)
 
 | | 역할 |
 |--|------|
