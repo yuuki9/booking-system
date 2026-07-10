@@ -18,7 +18,7 @@ Kotlin · Spring Boot 3.4 · PostgreSQL · Redis · Kafka · Docker Compose · k
 
 ---
 
-## 아키텍처 (한 장)
+## 시스템 아키텍처
 
 Compose 기본: `APP_MODE=standard`, `PAYMENT_ENABLED=true`  
 scale-out: Nginx → Reservation ×3, Payment ×3 (Kafka choreography)
