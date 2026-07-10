@@ -29,8 +29,9 @@ import java.time.Instant
  * ## 트레이드오프
  * - **timeout(60s) ≫ Mock PG 최대 지연**: 정상 결제가 reaper에 먹히지 않게 여유를 둔다.
  *   너무 짧으면 정상 APPROVED와 경합이 늘고, 너무 길면 좌석 점유 시간이 길어진다.
- * - **reaper vs 늦은 payment.result**: 둘 다 가드 UPDATE를 쓰므로 한쪽만 이긴다 (이중 보상 없음).
- * - **알려진 한계**: reaper 취소 후 늦은 APPROVED → 결제 성공·좌석 없음. 환불 보상은 미구현 (README 명시).
+ * - **reaper vs 늦은 payment.result**: 둘 다 가드 UPDATE를 쓰므로 한쪽만 이긴다 (이중 좌석 보상 없음).
+ * - **늦은 APPROVED after CANCELLED**: 좌석은 이미 반환된 상태이므로, Saga가 `REFUND_REQUESTED` Outbox로
+ *   payment에 환불을 요청한다 (Phase 6). 결제·예약 불일치를 payment `REFUNDED`로 닫는다.
  * - **consumer 프로파일 제외**: 로그 전용 consumer 프로세스에서 스케줄이 돌지 않게 `@Profile("!consumer")`.
  */
 @Component

@@ -13,7 +13,8 @@ import java.util.UUID
  * ## 트레이드오프
  * - APPROVED/FAILED 이진 분류: reservation 보상 로직을 단순화.
  *   세부 reason은 관측·디버그용이며 분기 키는 아니다.
- * - 늦은 APPROVED vs reaper CANCELLED 경합은 reservation 가드 UPDATE가 흡수 (한쪽만 성공).
+ * - 늦은 APPROVED vs reaper CANCELLED 경합: 가드 UPDATE로 좌석 보상은 한쪽만 성공.
+ *   CANCELLED 뒤 도착한 APPROVED는 reservation이 `payment.refund`로 금전 보상을 이어간다 (Phase 6).
  */
 enum class PaymentResultStatus {
     APPROVED,

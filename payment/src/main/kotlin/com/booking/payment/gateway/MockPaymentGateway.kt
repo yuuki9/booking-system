@@ -14,17 +14,23 @@ import kotlin.random.Random
  *
  * ## 작업 흐름 (우선순위)
  * ```
- * userId startsWith "fail-"     → Declined (즉시)
- * userId startsWith "timeout-"  → sleep(timeoutMs) → TimedOut
- * random < timeoutRate          → sleep → TimedOut
- * random < failureRate          → Declined
- * else                          → sleep(delayMin..delayMax) → Approved
+ * approve:
+ *   userId startsWith "fail-"     → Declined (즉시)
+ *   userId startsWith "timeout-"  → sleep(timeoutMs) → TimedOut
+ *   random < timeoutRate          → sleep → TimedOut
+ *   random < failureRate          → Declined
+ *   else                          → sleep(delayMin..delayMax) → Approved
+ *
+ * refund:
+ *   userId startsWith "refund-fail-" → Failed
+ *   else                             → 짧은 sleep → Refunded
  * ```
  *
  * ## 트레이드오프
  * - **Thread.sleep**: 호출 스레드(Kafka listener)를 블로킹. 랩·데모용. 실무 PG 클라이언트는
  *   논블로킹/타임아웃 예산·서킷브레이커를 둔다.
  * - **Mock만으로 충분**: 포트폴리오 초점은 “실제 카드사 연동”이 아니라 Saga·보상·멱등이다.
+ * - **refund 경로**: approve와 동일하게 TX 밖에서 호출. 실패 주입은 prefix만 (확률 실패는 생략).
  */
 @Component
 class MockPaymentGateway(
