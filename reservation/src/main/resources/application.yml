@@ -40,6 +40,7 @@ app:
       reservation-confirmed: reservation.confirmed
       reservation-pending: reservation.pending
       payment-result: payment.result
+      payment-refund: payment.refund
   standard:
     duplicate-check:
       enabled: true

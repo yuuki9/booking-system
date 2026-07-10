@@ -64,8 +64,20 @@ class MockPaymentGateway(
         return PaymentGatewayResult.Approved
     }
 
+    override fun refund(request: PaymentRefundRequest): PaymentGatewayRefundResult {
+        if (request.userId.startsWith(REFUND_FAIL_PREFIX)) {
+            return PaymentGatewayRefundResult.Failed("REFUND_DECLINED")
+        }
+        val delayMs = properties.delayMinMs.coerceAtMost(50)
+        if (delayMs > 0) {
+            Thread.sleep(delayMs)
+        }
+        return PaymentGatewayRefundResult.Refunded
+    }
+
     companion object {
         const val FAIL_PREFIX = "fail-"
         const val TIMEOUT_PREFIX = "timeout-"
+        const val REFUND_FAIL_PREFIX = "refund-fail-"
     }
 }

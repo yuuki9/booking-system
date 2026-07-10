@@ -36,4 +36,14 @@ class KafkaConfig {
             .partitions(3)
             .replicas(1)
             .build()
+
+    @Bean
+    @Profile("!aws")
+    fun paymentRefundTopic(
+        @Value("\${app.kafka.topic.payment-refund}") topic: String,
+    ): NewTopic =
+        TopicBuilder.name(topic)
+            .partitions(3)
+            .replicas(1)
+            .build()
 }

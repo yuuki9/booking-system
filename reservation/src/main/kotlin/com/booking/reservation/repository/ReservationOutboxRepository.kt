@@ -14,4 +14,6 @@ interface ReservationOutboxRepository : JpaRepository<ReservationOutbox, UUID> {
         """,
     )
     fun findUnpublished(): List<ReservationOutbox>
+
+    fun existsByReservationIdAndEventType(reservationId: UUID, eventType: String): Boolean
 }

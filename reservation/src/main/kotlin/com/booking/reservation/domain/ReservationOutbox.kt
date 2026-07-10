@@ -37,6 +37,9 @@ class ReservationOutbox(
     @Column(name = "amount")
     val amount: Long? = null,
 
+    @Column(name = "payment_id")
+    val paymentId: UUID? = null,
+
     @Column(name = "confirmed_at", nullable = false)
     val confirmedAt: Instant,
 

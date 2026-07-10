@@ -22,8 +22,8 @@ flowchart LR
 | 구성요소 | 역할 |
 |----------|------|
 | **reservation** | 멱등·중복검사·재고·락·Outbox·Saga 소비·reaper |
-| **payment** | Mock PG · `payment_db` · `payment.result` Outbox |
-| **Kafka** | `reservation.pending` / `payment.result` / `reservation.confirmed` |
+| **payment** | Mock PG · `payment_db` · `payment.result` / `payment.refund` Outbox |
+| **Kafka** | `reservation.pending` / `payment.result` / `payment.refund` / `reservation.confirmed` |
 | **Redis** | reservation만 사용 (재고 선차감 · `REDIS` 전략 시 분산 락) |
 | **contracts** | 위 이벤트 DTO만 공유 (도메인/DB 공유 없음) |
 
@@ -50,18 +50,23 @@ sequenceDiagram
     P->>P: Mock PG
     P->>K: payment.result
     K->>R: consume result
-    alt APPROVED
+    alt APPROVED (정상)
         R->>R: CONFIRMED + Outbox
         R->>K: reservation.confirmed
     else FAILED / TIMEOUT
         R->>R: CANCELLED + 좌석 반환
+    else APPROVED (이미 CANCELLED — reaper/보상 후)
+        R->>K: payment.refund (Outbox)
+        K->>P: Mock PG refund
+        P->>P: REFUNDED
     end
 ```
 
 **서비스 분리 근거:** 예약은 자기 DB 안에서 정합성(락·재고)을 지키고, 결제는 통제 불가능한 외부(PG)와 통신한다. 트랜잭션 경계·실패 모델이 달라 **choreography Saga + 보상 트랜잭션**으로 묶는다.
 
-**알려진 한계:** reaper가 먼저 `CANCELLED`로 만든 뒤 늦은 `APPROVED`가 오면 결제만 성공·좌석은 없는 드문 불일치가 생길 수 있다. 실무에서는 payment 환불 보상이 필요하다.  
-payment의 Mock PG 호출은 **DB 트랜잭션 밖**(PENDING 커밋 → PG → 결과+Outbox)이다. TX 사이 크래시 시 PENDING orphan 재처리는 랩 범위 밖이다.
+**Saga 보상:** 결제 실패·타임아웃은 reservation이 좌석을 반환한다. reaper가 먼저 `CANCELLED`로 만든 뒤 늦은 `APPROVED`가 오면 reservation이 `payment.refund`로 **환불 보상**을 요청하고 payment가 `REFUNDED`로 전이한다.
+
+payment의 Mock PG `approve`/`refund`는 **DB 트랜잭션 밖**에서 호출한다. TX 사이 크래시 시 PENDING orphan 재처리는 랩 범위 밖이다.
 
 설계 상세: [`docs/superpowers/specs/2026-07-08-payment-saga-msa-design.md`](docs/superpowers/specs/2026-07-08-payment-saga-msa-design.md)
 

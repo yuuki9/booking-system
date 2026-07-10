@@ -33,6 +33,7 @@ app:
     topic:
       reservation-pending: reservation.pending
       payment-result: payment.result
+      payment-refund: payment.refund
   outbox:
     poll-interval-ms: 2000
 

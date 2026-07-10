@@ -30,7 +30,7 @@
 | `reservation` | 8080 | `booking_system` | 예약·Outbox·Saga 소비·reaper |
 | `payment` | 8081 | `payment_db` | Mock PG·결제 Outbox |
 
-서비스 간 **동기 HTTP 호출 없음**. Kafka 토픽: `reservation.pending`, `payment.result`, `reservation.confirmed`.
+서비스 간 **동기 HTTP 호출 없음**. Kafka 토픽: `reservation.pending`, `payment.result`, `payment.refund`, `reservation.confirmed`.
 
 ---
 
@@ -114,6 +114,7 @@ POST /api/v1/reservations
   → payment: Mock PG → payment.result
   → APPROVED: CONFIRMED + reservation.confirmed Outbox
   → FAILED: CANCELLED + DB/Redis 좌석 반환 (보상)
+  → APPROVED but 이미 CANCELLED: payment.refund Outbox → payment REFUNDED
   → reaper: payment.result 유실 시 timeout 후 동일 보상
 ```
 

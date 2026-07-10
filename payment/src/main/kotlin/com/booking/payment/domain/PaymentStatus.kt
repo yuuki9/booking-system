@@ -4,4 +4,5 @@ enum class PaymentStatus {
     PENDING,
     APPROVED,
     FAILED,
+    REFUNDED,
 }

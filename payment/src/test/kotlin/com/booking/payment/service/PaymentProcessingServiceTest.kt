@@ -5,7 +5,9 @@ import com.booking.payment.config.PaymentGatewayProperties
 import com.booking.payment.domain.PaymentStatus
 import com.booking.payment.gateway.MockPaymentGateway
 import com.booking.payment.gateway.PaymentGateway
+import com.booking.payment.gateway.PaymentGatewayRefundResult
 import com.booking.payment.gateway.PaymentGatewayResult
+import com.booking.payment.gateway.PaymentRefundRequest
 import com.booking.payment.gateway.PaymentRequest
 import com.booking.payment.repository.PaymentOutboxRepository
 import com.booking.payment.repository.PaymentRepository
@@ -201,6 +203,9 @@ class PaymentProcessingServiceTest {
             }
             return delegate.approve(request)
         }
+
+        override fun refund(request: PaymentRefundRequest): PaymentGatewayRefundResult =
+            delegate.refund(request)
     }
 
     companion object {

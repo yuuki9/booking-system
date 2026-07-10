@@ -130,6 +130,43 @@ class StandardPaymentSagaServiceTest {
         assertEquals(0, eventRepository.findById(reservation.eventId).orElseThrow().reservedCount)
     }
 
+    @Test
+    fun `onApproved after CANCELLED enqueues refund requested outbox`() {
+        val reservation = seedPendingReservation()
+        jdbcTemplate.update("UPDATE events SET reserved_count = 1 WHERE id = ?", reservation.eventId)
+        sagaService.compensateTimeout(reservation.id, reservation.eventId)
+
+        val paymentId = UUID.randomUUID()
+        sagaService.onApproved(paymentResult(reservation, PaymentResultStatus.APPROVED, paymentId = paymentId))
+
+        assertEquals(ReservationStatus.CANCELLED, reservationRepository.findById(reservation.id).orElseThrow().status)
+        val refund = outboxRepository.findAll().single { it.eventType == OutboxEventType.REFUND_REQUESTED }
+        assertEquals(reservation.id, refund.reservationId)
+        assertEquals(paymentId, refund.paymentId)
+    }
+
+    @Test
+    fun `onApproved duplicate CONFIRMED does not enqueue refund`() {
+        val reservation = seedPendingReservation()
+        sagaService.onApproved(paymentResult(reservation, PaymentResultStatus.APPROVED))
+        sagaService.onApproved(paymentResult(reservation, PaymentResultStatus.APPROVED))
+
+        assertEquals(0, outboxRepository.findAll().count { it.eventType == OutboxEventType.REFUND_REQUESTED })
+    }
+
+    @Test
+    fun `onApproved duplicate refund outbox is idempotent when already CANCELLED`() {
+        val reservation = seedPendingReservation()
+        jdbcTemplate.update("UPDATE events SET reserved_count = 1 WHERE id = ?", reservation.eventId)
+        sagaService.compensateTimeout(reservation.id, reservation.eventId)
+
+        val approved = paymentResult(reservation, PaymentResultStatus.APPROVED)
+        sagaService.onApproved(approved)
+        sagaService.onApproved(approved)
+
+        assertEquals(1, outboxRepository.findAll().count { it.eventType == OutboxEventType.REFUND_REQUESTED })
+    }
+
     private fun seedPendingReservation(): Reservation {
         val event = eventRepository.findById(eventId()).orElseThrow()
         return reservationRepository.save(
@@ -145,9 +182,10 @@ class StandardPaymentSagaServiceTest {
         reservation: Reservation,
         status: PaymentResultStatus,
         failureReason: String? = null,
+        paymentId: UUID = UUID.randomUUID(),
     ): PaymentResultEvent =
         PaymentResultEvent(
-            paymentId = UUID.randomUUID(),
+            paymentId = paymentId,
             reservationId = reservation.id,
             eventId = reservation.eventId,
             userId = reservation.userId,

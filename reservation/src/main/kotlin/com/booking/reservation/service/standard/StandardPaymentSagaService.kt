@@ -4,10 +4,8 @@ import com.booking.contracts.PaymentResultEvent
 import com.booking.contracts.PaymentResultStatus
 import com.booking.reservation.config.AppModeProperties
 import com.booking.reservation.domain.LockStrategy
-import com.booking.reservation.domain.Reservation
 import com.booking.reservation.domain.ReservationStatus
 import com.booking.reservation.repository.EventRepository
-import com.booking.reservation.repository.ReservationOutboxRepository
 import com.booking.reservation.repository.ReservationRepository
 import org.slf4j.LoggerFactory
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -38,13 +36,15 @@ import java.util.UUID
  *
  * reaper / compensateTimeout
  *   → payment.result 유실 시 동일 보상 (lockStrategy 미저장 → Redis는 enabled면 무조건 rollback)
+ *
+ * payment.result(APPROVED) + 이미 CANCELLED (늦은 승인)
+ *   → Outbox REFUND_REQUESTED → payment.refund → Mock PG refund → REFUNDED
  * ```
  *
  * ## 트레이드오프
  * - **가드 UPDATE vs 엔티티 더티체킹**: 영향 행 수로 “누가 이겼는지”를 원자적으로 알 수 있다.
  *   `@Modifying` 후 영속성 컨텍스트는 stale일 수 있어, 전이 성공 시에만 재조회한다.
- * - **늦은 APPROVED**: reaper가 먼저 CANCELLED로 만든 뒤 APPROVED가 오면 0행 → WARN만.
- *   “결제는 됐는데 좌석은 없음” 불일치는 의도적으로 문서화만 하고, 환불 보상 이벤트는 범위 밖.
+ * - **늦은 APPROVED**: reaper가 먼저 CANCELLED로 만든 뒤 APPROVED가 오면 환불 Outbox로 payment에 보상 요청.
  * - **Redis rollback 판정**: `onFailed`는 이벤트의 `lockStrategy`로 `shouldApply` 판정.
  *   reaper는 예약에 lockStrategy가 없어 `redis-inventory.enabled`면 무조건 rollback (데모는 REDIS/OPTIMISTIC만 사용).
  */
@@ -73,7 +73,7 @@ class StandardPaymentSagaService(
             ReservationStatus.CONFIRMED,
         )
         if (updated == 0) {
-            log.warn("Late or duplicate approval ignored reservationId={}", event.reservationId)
+            handleLateOrDuplicateApproval(event)
             return
         }
         val reservation = reservationRepository.findById(event.reservationId).orElseThrow()
@@ -133,5 +133,32 @@ class StandardPaymentSagaService(
         }
         eventRepository.releaseSeat(eventId)
         return true
+    }
+
+    private fun handleLateOrDuplicateApproval(event: PaymentResultEvent) {
+        val current = reservationRepository.findById(event.reservationId).orElse(null)
+        when (current?.status) {
+            ReservationStatus.CANCELLED -> {
+                outboxService.enqueueRefundRequested(
+                    paymentId = event.paymentId,
+                    reservation = current,
+                    amount = event.amount,
+                )
+                log.warn(
+                    "Late APPROVED after CANCELLED → refund requested reservationId={}",
+                    event.reservationId,
+                )
+            }
+            ReservationStatus.CONFIRMED -> {
+                log.warn("Duplicate approval ignored reservationId={}", event.reservationId)
+            }
+            else -> {
+                log.warn(
+                    "Late or duplicate approval ignored reservationId={} status={}",
+                    event.reservationId,
+                    current?.status,
+                )
+            }
+        }
     }
 }

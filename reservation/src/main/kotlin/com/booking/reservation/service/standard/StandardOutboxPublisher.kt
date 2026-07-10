@@ -3,6 +3,7 @@ package com.booking.reservation.service.standard
 import com.booking.reservation.config.AppModeProperties
 import com.booking.contracts.ReservationConfirmedEvent
 import com.booking.contracts.ReservationPendingEvent
+import com.booking.contracts.PaymentRefundRequestedEvent
 import com.booking.reservation.domain.OutboxEventType
 import com.booking.reservation.kafka.ReservationEventPublisher
 import com.booking.reservation.repository.ReservationOutboxRepository
@@ -29,6 +30,7 @@ import java.time.Instant
  *   → findUnpublished()
  *   → PENDING  → ReservationPendingEvent  → reservation.pending
  *   → CONFIRMED → ReservationConfirmedEvent → reservation.confirmed
+ *   → REFUND_REQUESTED → PaymentRefundRequestedEvent → payment.refund
  *   → publishedAt = now
  *   → 실패 행은 publishedAt 비움 → 다음 틱 재시도
  * ```
@@ -85,6 +87,23 @@ class StandardOutboxPublisher(
                                 userId = row.userId,
                                 lockStrategy = row.lockStrategy,
                                 confirmedAt = row.confirmedAt,
+                            ),
+                        )
+                    }
+                    OutboxEventType.REFUND_REQUESTED -> {
+                        val paymentId = row.paymentId
+                            ?: error("Outbox REFUND_REQUESTED missing paymentId reservationId=${row.reservationId}")
+                        val amount = row.amount
+                            ?: error("Outbox REFUND_REQUESTED missing amount reservationId=${row.reservationId}")
+                        reservationEventPublisher.publishRefundRequested(
+                            PaymentRefundRequestedEvent(
+                                paymentId = paymentId,
+                                reservationId = row.reservationId,
+                                eventId = row.eventId,
+                                userId = row.userId,
+                                amount = amount,
+                                reason = REFUND_REASON_LATE_APPROVAL_AFTER_CANCEL,
+                                occurredAt = row.confirmedAt,
                             ),
                         )
                     }
