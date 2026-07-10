@@ -556,7 +556,9 @@ fun process(event: ReservationPendingEvent) {
 }
 ```
 
-주의: 2의 gateway 호출은 sleep이 있어 트랜잭션이 길어진다. 실무라면 트랜잭션 분리가 맞지만 **이 랩에서는 단순화하여 한 트랜잭션으로 구현하고, 코드 주석으로 트레이드오프를 명시한다.** (Kafka listener 동시성으로 처리량 확보 — `@KafkaListener(concurrency = "3")`.)
+주의: gateway 호출은 DB 트랜잭션 **밖**에서 수행한다 (TX1 PENDING 커밋 → PG → TX2 결과+Outbox).
+PG sleep/timeout 동안 커넥션을 붙잡지 않는다. TX1~TX2 사이 크래시 시 PENDING orphan이 남을 수 있어
+운영이라면 PENDING 재처리가 필요하다. `@KafkaListener(concurrency = "3")`으로 처리량을 확보한다.
 
 ### 7.4 `ReservationPendingConsumer` / `PaymentOutboxPublisher`
 
@@ -942,4 +944,4 @@ README에 다음이 수치·다이어그램과 함께 드러나야 한다.
 - [ ] 왜 모노레포 멀티 모듈인가 (독립성은 배포 단위에서 확보, 공유는 contracts뿐)
 - [ ] Saga choreography 흐름도 + 보상 트랜잭션 경로
 - [ ] 실패 주입 결과: "결제 실패 N%에서도 재고 정합성 유지" k6 수치
-- [ ] 알려진 한계와 실무 확장 방향 (늦은 승인 처리, PG 트랜잭션 분리)
+- [x] 알려진 한계와 실무 확장 방향 (늦은 승인 처리, PG 트랜잭션 분리 — TX 분리는 반영, 늦은 승인 환불은 미구현)

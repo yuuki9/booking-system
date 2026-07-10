@@ -60,7 +60,8 @@ sequenceDiagram
 
 **서비스 분리 근거:** 예약은 자기 DB 안에서 정합성(락·재고)을 지키고, 결제는 통제 불가능한 외부(PG)와 통신한다. 트랜잭션 경계·실패 모델이 달라 **choreography Saga + 보상 트랜잭션**으로 묶는다.
 
-**알려진 한계:** reaper가 먼저 `CANCELLED`로 만든 뒤 늦은 `APPROVED`가 오면 결제만 성공·좌석은 없는 드문 불일치가 생길 수 있다. 실무에서는 payment 환불 보상이 필요하다.
+**알려진 한계:** reaper가 먼저 `CANCELLED`로 만든 뒤 늦은 `APPROVED`가 오면 결제만 성공·좌석은 없는 드문 불일치가 생길 수 있다. 실무에서는 payment 환불 보상이 필요하다.  
+payment의 Mock PG 호출은 **DB 트랜잭션 밖**(PENDING 커밋 → PG → 결과+Outbox)이다. TX 사이 크래시 시 PENDING orphan 재처리는 랩 범위 밖이다.
 
 설계 상세: [`docs/superpowers/specs/2026-07-08-payment-saga-msa-design.md`](docs/superpowers/specs/2026-07-08-payment-saga-msa-design.md)
 
