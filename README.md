@@ -34,6 +34,7 @@ scale-out: Nginx → Reservation ×3, Payment ×3 (Kafka choreography)
 | **contracts** | 이벤트 DTO만 공유 (DB/도메인 공유 없음) |
 
 ```mermaid
+%%{init: {'sequence': {'mirrorActors': false}}}%%
 sequenceDiagram
     participant C as Client
     participant R as reservation
